@@ -7,7 +7,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function CompletionScreen() {
   const handleComplete = () => {
-    router.replace("/");
+    router.replace("/home");
   };
 
   return (
