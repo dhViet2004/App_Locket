@@ -54,6 +54,13 @@ export default function RootLayout() {
           presentation: 'modal'
         }} 
       />
+      <Stack.Screen 
+        name="photo-preview" 
+        options={{ 
+          headerShown: false,
+          presentation: 'modal'
+        }} 
+      />
       </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
