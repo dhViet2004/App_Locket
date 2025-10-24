@@ -1,353 +1,237 @@
-# 🔐 Locket Backend API
+# Locket-like Social App Backend (MongoDB/Mongoose)
 
-Backend API cho ứng dụng Locket sử dụng JSON Server với authentication và các tính năng social media.
+Thiết kế cơ sở dữ liệu và service nền cho ứng dụng kiểu Locket: chia sẻ ảnh, bình luận, cảm xúc, bạn bè, thông báo; kèm gói Premium có thời hạn, quản lý trạng thái hoạt động (presence), phân quyền admin (RBAC), quảng cáo, và doanh thu/metrics. Không sử dụng cron/scripts — số liệu được cập nhật theo sự kiện (event-driven) và tính “khi cần” (on-demand).
 
-## 🚀 Tính năng
+## Tính năng chính
+- Bài đăng ảnh (Post), bình luận (Comment), cảm xúc (Reaction) với bộ đếm.
+- Bạn bè 2 chiều (Friendship) với pending/accepted/blocked.
+- Thông báo (Notification) cho kết bạn, bình luận, reaction.
+- Premium theo gói (Plan, Subscription, Invoice, Refund) + snapshot nhanh trên User.
+- Trạng thái hoạt động (Presence) qua Session TTL và heartbeat, snapshot trên User.
+- RBAC: vai trò user/moderator/admin/superadmin; nhật ký quản trị (AdminAuditLog).
+- Quảng cáo (Ad), chiến dịch (AdCampaign), sự kiện quảng cáo (AdEvent) và service phân phối.
+- Doanh thu và metrics: snapshot theo ngày (RevenueSnapshotDaily), cập nhật event-driven.
 
-- ✅ **Authentication**: Đăng ký, đăng nhập với JWT
-- ✅ **User Management**: Quản lý profile, avatar, bio
-- ✅ **Posts**: Tạo, xem, like/unlike posts
-- ✅ **Comments**: Thêm, xem comments
-- ✅ **Stories**: Tạo stories với thời gian hết hạn
-- ✅ **Notifications**: Hệ thống thông báo
-- ✅ **Follow System**: Theo dõi người dùng
-- ✅ **Real-time Data**: JSON Server với middleware
+## Công nghệ
+- Node.js + TypeScript
+- MongoDB + Mongoose
+## Import vào database MongoDB
+mongosh 
+load("E:/NhomReactNative/App_Locket/Backend/src/data/seed_all.mongo.js")
+## Cấu trúc thư mục (gợi ý)
+- src/models
+  - user.model.ts
+  - friendship.model.ts
+  - device.model.ts
+  - session.model.ts
+  - post.model.ts
+  - comment.model.ts
+  - reaction.model.ts
+  - notification.model.ts
+  - plan.model.ts
+  - subscription.model.ts
+  - invoice.model.ts
+  - refund.model.ts
+  - ad.model.ts
+  - ad_campaign.model.ts
+  - ad_event.model.ts
+  - admin_audit_log.model.ts
+  - revenue_snapshot_daily.model.ts
+- src/services
+  - ad.service.ts
+  - revenue.event-driven.ts
+  - premium.util.ts
+  - presence.util.ts
 
-## 📦 Cài đặt
+## Quan hệ giữa các model (tóm tắt)
+- User 1–N: Post, Comment, Reaction, Device, Session, Notification, Subscription, Invoice, Refund, AdminAuditLog (actor).
+- User ↔ User: Friendship (N–N) qua document (userA<userB), unique (userA,userB).
+- Post 1–N: Comment (thread bằng parentComment), Reaction.
+- Notification tham chiếu: user (người nhận), actor, post/comment/friendship (tùy).
+- Premium: Subscription thuộc User và Plan; User có snapshot premium {status, expiresAt, plan, subscription}.
+- Billing: Subscription 1–N Invoice; Invoice 1–N Refund.
+- Ads: Ad 1–N AdCampaign; AdCampaign 1–N AdEvent; AdCampaign có thể tham chiếu advertiser (User).
+- Presence: Session (TTL) theo user/device/platform; User.presence là snapshot.
+- Doanh thu: RevenueSnapshotDaily là snapshot tổng hợp theo ngày (không tham chiếu trực tiếp).
 
-```bash
-# Di chuyển vào thư mục Backend
-cd Backend
+## Các collection và ràng buộc quan trọng
+- users: unique username/email/phone; roles[]; premium snapshot; presence; lastSeenAt.
+- friendships: unique (userA,userB); status pending/accepted/blocked; requestedBy; blockedBy; acceptedAt.
+- posts: author, imageUrl, caption, visibility, reactionCount/commentCount, reactionCounts, deletedAt.
+- comments: post, author, content, parentComment, mentions[], isDeleted (soft delete).
+- reactions: unique (post,user) để mỗi user tối đa 1 reaction/bài; type enum.
+- notifications: user, actor, type, post?, comment?, friendship?, readAt.
+- devices: unique pushToken; lastActiveAt.
+- sessions: lastHeartbeatAt có TTL (ví dụ 15 phút) để cleanup; foreground/state.
+- plans: code unique; price, interval(+count), trialDays, features, isActive.
+- subscriptions: user, plan, status, currentPeriodStart/End, cancelAtPeriodEnd, canceledAt, autoRenew, provider, externalSubscriptionId.
+- invoices: subscription, user; subtotal/discount/tax/providerFee/platformFee; grossAmount, netAmount; status; paidAt; periodStart/End.
+- refunds: invoice, user; amount; status; refundedAt.
+- ads: placement(feed/splash/banner), isActive, startAt/endAt, priority, impressionCount/clickCount, cta.
+- ad_campaigns: ad, advertiser?; pricingModel (CPM/CPC/FLAT); rates; budgets/caps; startAt/endAt; status; counters.
+- ad_events: campaign, ad, user?, type (impression/click), at.
+- admin_audit_logs: actor, action, targetUser?, targetPost?, targetComment?, targetAd?, details, reason.
+- revenue_snapshot_daily: day, currency (cố định, ví dụ VND), số liệu gộp: subs, ads, DAU/MAU/ARPU, churn, MRR/ARR.
 
-# Cài đặt dependencies
-npm install
+## Index khuyến nghị
+- User: username/email/phone unique; roles; premium.status/expiresAt; presence.status; lastSeenAt.
+- Friendship: (userA, userB) unique; status.
+- Post: (author, createdAt), (visibility, createdAt).
+- Comment: (post, createdAt), (parentComment, createdAt).
+- Reaction: (post, user) unique; (post, createdAt).
+- Notification: (user, readAt, createdAt).
+- Device: pushToken unique; (user, lastActiveAt).
+- Session: TTL lastHeartbeatAt; (user, lastHeartbeatAt).
+- Plan: code unique.
+- Subscription: (user, status, currentPeriodEnd).
+- Invoice: (user, createdAt), (subscription, createdAt), paidAt, netAmount.
+- Refund: (user, refundedAt), (status, refundedAt).
+- Ad: (placement, isActive, startAt, endAt), priority.
+- AdCampaign: (status, startAt, endAt), advertiser.
+- AdEvent: (campaign, type, at).
+- AdminAuditLog: actor, action, createdAt desc.
+- RevenueSnapshotDaily: day unique, createdAt desc.
 
-# Hoặc sử dụng yarn
-yarn install
-```
+## Quy tắc nghiệp vụ chính
+- Quyền xem post: mặc định friends; có thể mở rộng private/custom list.
+- Reaction: mỗi user tối đa 1 reaction/bài; đổi emoji = update type.
+- Bình luận: reply bằng parentComment; xóa mềm isDeleted để giữ mạch hội thoại.
+- Presence: app/web gửi heartbeat 30–60s; Session TTL tự dọn; User.presence là snapshot.
+- Premium:
+  - active nếu status ∈ {trialing, active, grace} và expiresAt > now.
+  - cập nhật snapshot user.premium khi Subscription/Invoice thay đổi.
+- RBAC: vai trò user/moderator/admin/superadmin; policy ví dụ:
+  - manageUsers: admin+
+  - moderateContent: moderator+
+  - managePlans: admin+
+- Quảng cáo:
+  - Premium active không thấy quảng cáo.
+  - Chọn quảng cáo theo placement, isActive và thời gian; ưu tiên priority; random nhẹ.
+  - Ghi nhận impression/click tăng counters và log AdEvent.
+- Doanh thu/metrics:
+  - Event-driven: khi Invoice paid/Refund thành công/AdEvent, cập nhật ngay RevenueSnapshotDaily bằng $inc.
+  - On-demand: khi mở dashboard 1 ngày, tính DAU/MAU/ARPU/MRR/ARR/Churn và ghi $set vào snapshot.
+  - Không dùng cron/scripts, không dùng tỉ giá; 1 loại tiền tệ duy nhất (ví dụ VND).
 
-## 🏃‍♂️ Chạy Server
+## Trích đoạn model RevenueSnapshotDaily
+(Đoạn mã tham chiếu, dùng tiền tệ cố định)
 
-```bash
-# Chạy server development
-npm run dev
+```typescript
+import mongoose, { Schema, Document } from 'mongoose';
 
-# Hoặc chạy server production
-npm start
+export interface IRevenueSnapshotDaily extends Document {
+  day: string;          // yyyy-mm-dd (UTC)
+  currency: string;     // tiền tệ gốc sau quy đổi (ví dụ 'VND')
 
-# Chạy JSON Server đơn giản
-npm run json-server
-```
+  // Subscription
+  subsGross: number;
+  subsNet: number;
+  subsTax: number;
+  subsProviderFees: number;
+  subsPlatformFees: number;
+  refunds: number;      // số tiền refund trong ngày (giảm doanh thu)
 
-Server sẽ chạy tại: `http://localhost:3001`
+  // Ads (ước tính dựa trên pricing)
+  adsRevenue: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;          // clicks / impressions
 
-## 📚 API Endpoints
+  // Core metrics
+  dau: number;          // Daily Active Users
+  mau: number;          // 30-day MAU (tại ngày này)
+  arpu: number;         // (subsNet + adsRevenue) / DAU
+  arpdaus?: number;     // nếu muốn phân chia theo nguồn
 
-### 🔐 Authentication
+  // Subscription metrics
+  activeSubscribers: number;
+  newSubscribers: number;       // số sub bắt đầu trong ngày
+  canceledSubscribers: number;  // số sub hủy trong ngày
+  churnRate: number;            // canceled / active_prev_day
+  mrr: number;                  // Monthly Recurring Revenue (ước tính)
+  arr: number;                  // Annualized (mrr * 12)
 
-#### Đăng ký
-```http
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "password123",
-  "name": "John Doe",
-  "username": "johndoe"
+  createdAt: Date;
+  updatedAt: Date;
 }
+
+const RevenueSnapshotDailySchema = new Schema<IRevenueSnapshotDaily>(
+  {
+    day: { type: String, required: true, index: true },
+    currency: { type: String, required: true, default: 'VND' },
+
+    subsGross: { type: Number, required: true, default: 0 },
+    subsNet: { type: Number, required: true, default: 0, index: true },
+    subsTax: { type: Number, required: true, default: 0 },
+    subsProviderFees: { type: Number, required: true, default: 0 },
+    subsPlatformFees: { type: Number, required: true, default: 0 },
+    refunds: { type: Number, required: true, default: 0 },
+
+    adsRevenue: { type: Number, required: true, default: 0 },
+    impressions: { type: Number, required: true, default: 0 },
+    clicks: { type: Number, required: true, default: 0 },
+    ctr: { type: Number, required: true, default: 0 },
+
+    dau: { type: Number, required: true, default: 0 },
+    mau: { type: Number, required: true, default: 0 },
+    arpu: { type: Number, required: true, default: 0 },
+
+    activeSubscribers: { type: Number, required: true, default: 0 },
+    newSubscribers: { type: Number, required: true, default: 0 },
+    canceledSubscribers: { type: Number, required: true, default: 0 },
+    churnRate: { type: Number, required: true, default: 0 },
+    mrr: { type: Number, required: true, default: 0 },
+    arr: { type: Number, required: true, default: 0 },
+  },
+  { timestamps: true }
+);
+
+RevenueSnapshotDailySchema.index({ day: 1 }, { unique: true });
+RevenueSnapshotDailySchema.index({ createdAt: -1 });
+
+export const RevenueSnapshotDaily = mongoose.model<IRevenueSnapshotDaily>('RevenueSnapshotDaily', RevenueSnapshotDailySchema);
 ```
 
-#### Đăng nhập
-```http
-POST /api/auth/login
-Content-Type: application/json
+## Hướng dẫn khởi động (tham khảo)
+1) Chuẩn bị
+- Node.js v18+ và MongoDB 6+
+- Tạo database MongoDB, cấu hình MONGO_URI
 
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
+2) Cài đặt
+- Cài đặt package, build (nếu dùng TypeScript), khởi tạo kết nối MongoDB trong app của bạn.
 
-#### Lấy thông tin user
-```http
-GET /api/auth/me
-Authorization: Bearer <token>
-```
+3) Biến môi trường (gợi ý)
+- MONGO_URI=mongodb://localhost:27017/locket_like
+- NODE_ENV=development
 
-#### Cập nhật profile
-```http
-PUT /api/auth/profile
-Authorization: Bearer <token>
-Content-Type: application/json
+4) Tạo index
+- Mongoose sẽ tạo theo schema; hoặc chủ động tạo index thủ công nếu cần hiệu năng.
 
-{
-  "name": "John Doe Updated",
-  "bio": "New bio",
-  "avatar": "https://example.com/avatar.jpg"
-}
-```
+## Sử dụng các service
 
-### 📱 Posts
+### Quảng cáo
+- shouldShowAdsForUser(user): boolean — ẩn ads nếu user premium còn hiệu lực.
+- listActiveAds({ placement, limit, now, excludeIds }) — lấy danh sách ads đang hoạt động theo vị trí.
+- getFeedAdsForUser(user, limit, excludeIds) — lấy ads cho feed (đã xét premium).
+- trackAdImpression(adId) / trackAdClick(adId) — tăng counters.
 
-#### Lấy tất cả posts
-```http
-GET /api/posts
-Authorization: Bearer <token>
-```
+### Doanh thu (event-driven, không cron)
+- recordInvoicePaid(invoiceId) — gọi khi Invoice chuyển sang paid.
+- recordRefundSucceeded(refundId) — gọi khi Refund thành công.
+- recordAdEvent(campaignId, adId, 'impression'|'click', at, count?, userId?) — ghi nhận sự kiện quảng cáo, cập nhật snapshot ngày.
+- getOrComputeDailySnapshot(dayDate) — khi mở dashboard 1 ngày: đảm bảo FLAT ads per-day, tính DAU/MAU/ARPU/MRR/ARR/Churn và cache vào snapshot.
 
-#### Tạo post mới
-```http
-POST /api/posts
-Authorization: Bearer <token>
-Content-Type: application/json
+## Gợi ý bảo mật & riêng tư
+- Băm mật khẩu (bcrypt/argon2), bảo vệ JWT/session.
+- Lọc, rate-limit các endpoint bình luận/bài đăng để chống spam.
+- RBAC middleware chặn truy cập admin/mod.
+- Soft delete nội dung vi phạm; lưu AdminAuditLog để audit.
 
-{
-  "imageUrl": "https://example.com/image.jpg",
-  "caption": "Beautiful sunset!",
-  "location": "Beach, California"
-}
-```
+## Lộ trình mở rộng
+- Close friends/custom list cho quyền xem post.
+- Report/Appeal nội dung và người dùng.
+- Targeting quảng cáo theo hành vi (cân nhắc riêng tư).
+- Tối ưu counters bằng transaction/middleware thay vì change streams.
 
-#### Like/Unlike post
-```http
-POST /api/posts/:id/like
-Authorization: Bearer <token>
-```
-
-### 💬 Comments
-
-#### Lấy comments của post
-```http
-GET /api/posts/:id/comments
-Authorization: Bearer <token>
-```
-
-#### Thêm comment
-```http
-POST /api/posts/:id/comments
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "content": "Great post! 🔥"
-}
-```
-
-### 📖 Stories
-
-#### Lấy tất cả stories
-```http
-GET /api/stories
-Authorization: Bearer <token>
-```
-
-#### Tạo story mới
-```http
-POST /api/stories
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "imageUrl": "https://example.com/story.jpg"
-}
-```
-
-### 🔔 Notifications
-
-#### Lấy notifications
-```http
-GET /api/notifications
-Authorization: Bearer <token>
-```
-
-#### Đánh dấu đã đọc
-```http
-PUT /api/notifications/:id/read
-Authorization: Bearer <token>
-```
-
-## 🗄️ Database Schema
-
-### Users
-```json
-{
-  "id": 1,
-  "email": "user@example.com",
-  "password": "hashed_password",
-  "name": "John Doe",
-  "username": "johndoe",
-  "avatar": "https://example.com/avatar.jpg",
-  "bio": "User bio",
-  "isVerified": false,
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-### Posts
-```json
-{
-  "id": 1,
-  "userId": 1,
-  "imageUrl": "https://example.com/image.jpg",
-  "caption": "Post caption",
-  "location": "Location",
-  "likes": 10,
-  "comments": 5,
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-### Comments
-```json
-{
-  "id": 1,
-  "postId": 1,
-  "userId": 2,
-  "content": "Comment content",
-  "createdAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-### Stories
-```json
-{
-  "id": 1,
-  "userId": 1,
-  "imageUrl": "https://example.com/story.jpg",
-  "expiresAt": "2024-01-02T00:00:00.000Z",
-  "createdAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-### Notifications
-```json
-{
-  "id": 1,
-  "userId": 1,
-  "type": "like",
-  "fromUserId": 2,
-  "postId": 1,
-  "message": "John liked your post",
-  "isRead": false,
-  "createdAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-## 🔧 Cấu hình
-
-### Environment Variables
-```bash
-PORT=3001
-JWT_SECRET=your-secret-key
-```
-
-### CORS
-Server đã được cấu hình CORS để cho phép requests từ frontend.
-
-### JWT Authentication
-- Token hết hạn sau 7 ngày
-- Sử dụng Bearer token trong header Authorization
-- Format: `Authorization: Bearer <token>`
-
-## 🧪 Testing
-
-### Health Check
-```http
-GET /health
-```
-
-### Test với cURL
-
-#### Đăng ký
-```bash
-curl -X POST http://localhost:3001/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "password123",
-    "name": "Test User",
-    "username": "testuser"
-  }'
-```
-
-#### Đăng nhập
-```bash
-curl -X POST http://localhost:3001/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "password123"
-  }'
-```
-
-## 📱 Kết nối với Frontend
-
-Trong ứng dụng React Native/Expo, sử dụng:
-
-```javascript
-const API_BASE_URL = 'http://localhost:3001/api';
-
-// Đăng nhập
-const login = async (email, password) => {
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ email, password }),
-  });
-  return response.json();
-};
-
-// Lấy posts
-const getPosts = async (token) => {
-  const response = await fetch(`${API_BASE_URL}/posts`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-  return response.json();
-};
-```
-
-## 🚀 Deployment
-
-### Sử dụng PM2
-```bash
-npm install -g pm2
-pm2 start server.js --name "locket-backend"
-```
-
-### Docker
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-EXPOSE 3001
-CMD ["npm", "start"]
-```
-
-## 📝 Notes
-
-- Database được lưu trong file `db.json`
-- Tất cả passwords được hash bằng bcrypt
-- JWT tokens có thời hạn 7 ngày
-- Stories tự động hết hạn sau 24 giờ
-- Server hỗ trợ CORS cho development
-
-## 🤝 Contributing
-
-1. Fork repository
-2. Tạo feature branch
-3. Commit changes
-4. Push to branch
-5. Tạo Pull Request
-
-## 📄 License
-
-MIT License - xem file LICENSE để biết thêm chi tiết.
+---
+Nếu bạn muốn, mình có thể thêm ví dụ endpoint Express/NestJS cho các service trên, hoặc chuyển toàn bộ schema sang JavaScript thuần.
