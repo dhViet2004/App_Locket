@@ -1,0 +1,476 @@
+{
+  "friendships": [
+    {
+      "id": 1,
+      "requesterId": 1,
+      "receiverId": 2,
+      "status": "accepted",
+      "createdAt": "2023-06-15T10:30:00Z",
+      "acceptedAt": "2023-06-15T14:22:00Z"
+    },
+    {
+      "id": 2,
+      "requesterId": 1,
+      "receiverId": 3,
+      "status": "accepted",
+      "createdAt": "2023-08-20T09:15:00Z",
+      "acceptedAt": "2023-08-20T16:45:00Z"
+    },
+    {
+      "id": 3,
+      "requesterId": 2,
+      "receiverId": 4,
+      "status": "pending",
+      "createdAt": "2024-01-18T11:20:00Z",
+      "acceptedAt": null
+    },
+    {
+      "id": 4,
+      "requesterId": 3,
+      "receiverId": 4,
+      "status": "accepted",
+      "createdAt": "2023-11-10T13:45:00Z",
+      "acceptedAt": "2023-11-11T08:30:00Z"
+    },
+    {
+      "id": 5,
+      "requesterId": 4,
+      "receiverId": 5,
+      "status": "accepted",
+      "createdAt": "2023-12-05T15:20:00Z",
+      "acceptedAt": "2023-12-06T10:15:00Z"
+    },
+    {
+      "id": 6,
+      "requesterId": 1,
+      "receiverId": 5,
+      "status": "pending",
+      "createdAt": "2024-01-19T16:30:00Z",
+      "acceptedAt": null
+    },
+    {
+      "id": 7,
+      "requesterId": 2,
+      "receiverId": 3,
+      "status": "blocked",
+      "createdAt": "2023-09-15T12:00:00Z",
+      "acceptedAt": null,
+      "blockedAt": "2023-09-20T14:30:00Z"
+    },
+    {
+      "id": 8,
+      "requesterId": 5,
+      "receiverId": 1,
+      "status": "accepted",
+      "createdAt": "2023-10-12T08:45:00Z",
+      "acceptedAt": "2023-10-12T20:15:00Z"
+    }
+  ],
+  "photos": [
+    {
+      "id": 1,
+      "userId": 1,
+      "imageUrl": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
+      "caption": "Beautiful sunset at the beach today! 🌅 #sunset #beach #photography",
+      "location": "Malibu Beach, CA",
+      "tags": [
+        "sunset",
+        "beach",
+        "photography",
+        "nature"
+      ],
+      "isPublic": true,
+      "viewCount": 245,
+      "createdAt": "2024-01-20T18:30:00Z",
+      "updatedAt": "2024-01-20T18:30:00Z"
+    },
+    {
+      "id": 2,
+      "userId": 2,
+      "imageUrl": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&h=600&fit=crop",
+      "caption": "Morning hike in the mountains. The view was absolutely breathtaking! 🏔️",
+      "location": "Rocky Mountains, CO",
+      "tags": [
+        "mountains",
+        "hiking",
+        "nature",
+        "adventure"
+      ],
+      "isPublic": true,
+      "viewCount": 189,
+      "createdAt": "2024-01-19T07:15:00Z",
+      "updatedAt": "2024-01-19T07:15:00Z"
+    },
+    {
+      "id": 3,
+      "userId": 3,
+      "imageUrl": "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&h=600&fit=crop",
+      "caption": "Street art in downtown. Love the vibrant colors! 🎨",
+      "location": "Downtown LA",
+      "tags": [
+        "streetart",
+        "urban",
+        "colorful",
+        "art"
+      ],
+      "isPublic": true,
+      "viewCount": 156,
+      "createdAt": "2024-01-18T14:22:00Z",
+      "updatedAt": "2024-01-18T14:22:00Z"
+    },
+    {
+      "id": 4,
+      "userId": 4,
+      "imageUrl": "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&h=600&fit=crop",
+      "caption": "Golden hour in the forest. Nature never fails to amaze me 🌲",
+      "location": "Redwood National Park",
+      "tags": [
+        "forest",
+        "goldenhour",
+        "nature",
+        "trees"
+      ],
+      "isPublic": true,
+      "viewCount": 312,
+      "createdAt": "2024-01-17T16:45:00Z",
+      "updatedAt": "2024-01-17T16:45:00Z"
+    },
+    {
+      "id": 5,
+      "userId": 5,
+      "imageUrl": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
+      "caption": "Wildlife photography session. This eagle was so majestic! 🦅",
+      "location": "Yellowstone National Park",
+      "tags": [
+        "wildlife",
+        "eagle",
+        "nature",
+        "photography"
+      ],
+      "isPublic": true,
+      "viewCount": 278,
+      "createdAt": "2024-01-16T11:30:00Z",
+      "updatedAt": "2024-01-16T11:30:00Z"
+    },
+    {
+      "id": 6,
+      "userId": 1,
+      "imageUrl": "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=600&fit=crop",
+      "caption": "Coffee shop vibes ☕ Perfect place to work and relax",
+      "location": "Local Coffee Shop",
+      "tags": [
+        "coffee",
+        "work",
+        "relax",
+        "lifestyle"
+      ],
+      "isPublic": true,
+      "viewCount": 134,
+      "createdAt": "2024-01-15T10:20:00Z",
+      "updatedAt": "2024-01-15T10:20:00Z"
+    },
+    {
+      "id": 7,
+      "userId": 2,
+      "imageUrl": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
+      "caption": "Urban exploration in the city. Found this amazing rooftop view! 🏙️",
+      "location": "Downtown NYC",
+      "tags": [
+        "urban",
+        "city",
+        "rooftop",
+        "skyline"
+      ],
+      "isPublic": true,
+      "viewCount": 203,
+      "createdAt": "2024-01-14T19:15:00Z",
+      "updatedAt": "2024-01-14T19:15:00Z"
+    },
+    {
+      "id": 8,
+      "userId": 3,
+      "imageUrl": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
+      "caption": "Black and white photography. Sometimes less is more 📸",
+      "location": "Local Park",
+      "tags": [
+        "blackandwhite",
+        "minimalist",
+        "photography",
+        "art"
+      ],
+      "isPublic": false,
+      "viewCount": 67,
+      "createdAt": "2024-01-13T15:45:00Z",
+      "updatedAt": "2024-01-13T15:45:00Z"
+    }
+  ],
+  "reactions": [
+    {
+      "id": 1,
+      "photoId": 1,
+      "userId": 2,
+      "emoji": "❤️",
+      "createdAt": "2024-01-20T18:45:00Z"
+    },
+    {
+      "id": 2,
+      "photoId": 1,
+      "userId": 3,
+      "emoji": "👍",
+      "createdAt": "2024-01-20T19:12:00Z"
+    },
+    {
+      "id": 3,
+      "photoId": 1,
+      "userId": 4,
+      "emoji": "😍",
+      "createdAt": "2024-01-20T20:30:00Z"
+    },
+    {
+      "id": 4,
+      "photoId": 2,
+      "userId": 1,
+      "emoji": "❤️",
+      "createdAt": "2024-01-19T08:20:00Z"
+    },
+    {
+      "id": 5,
+      "photoId": 2,
+      "userId": 3,
+      "emoji": "🔥",
+      "createdAt": "2024-01-19T09:15:00Z"
+    },
+    {
+      "id": 6,
+      "photoId": 2,
+      "userId": 5,
+      "emoji": "👍",
+      "createdAt": "2024-01-19T10:45:00Z"
+    },
+    {
+      "id": 7,
+      "photoId": 3,
+      "userId": 1,
+      "emoji": "🎨",
+      "createdAt": "2024-01-18T15:30:00Z"
+    },
+    {
+      "id": 8,
+      "photoId": 3,
+      "userId": 2,
+      "emoji": "❤️",
+      "createdAt": "2024-01-18T16:22:00Z"
+    },
+    {
+      "id": 9,
+      "photoId": 3,
+      "userId": 4,
+      "emoji": "😍",
+      "createdAt": "2024-01-18T17:15:00Z"
+    },
+    {
+      "id": 10,
+      "photoId": 4,
+      "userId": 1,
+      "emoji": "🌲",
+      "createdAt": "2024-01-17T17:30:00Z"
+    },
+    {
+      "id": 11,
+      "photoId": 4,
+      "userId": 2,
+      "emoji": "❤️",
+      "createdAt": "2024-01-17T18:45:00Z"
+    },
+    {
+      "id": 12,
+      "photoId": 4,
+      "userId": 3,
+      "emoji": "👍",
+      "createdAt": "2024-01-17T19:20:00Z"
+    },
+    {
+      "id": 13,
+      "photoId": 4,
+      "userId": 5,
+      "emoji": "😍",
+      "createdAt": "2024-01-17T20:10:00Z"
+    },
+    {
+      "id": 14,
+      "photoId": 5,
+      "userId": 1,
+      "emoji": "🦅",
+      "createdAt": "2024-01-16T12:15:00Z"
+    },
+    {
+      "id": 15,
+      "photoId": 5,
+      "userId": 2,
+      "emoji": "❤️",
+      "createdAt": "2024-01-16T13:30:00Z"
+    },
+    {
+      "id": 16,
+      "photoId": 5,
+      "userId": 3,
+      "emoji": "👍",
+      "createdAt": "2024-01-16T14:45:00Z"
+    },
+    {
+      "id": 17,
+      "photoId": 5,
+      "userId": 4,
+      "emoji": "😍",
+      "createdAt": "2024-01-16T15:20:00Z"
+    },
+    {
+      "id": 18,
+      "photoId": 6,
+      "userId": 2,
+      "emoji": "☕",
+      "createdAt": "2024-01-15T11:30:00Z"
+    },
+    {
+      "id": 19,
+      "photoId": 6,
+      "userId": 3,
+      "emoji": "❤️",
+      "createdAt": "2024-01-15T12:15:00Z"
+    },
+    {
+      "id": 20,
+      "photoId": 7,
+      "userId": 1,
+      "emoji": "🏙️",
+      "createdAt": "2024-01-14T20:00:00Z"
+    },
+    {
+      "id": 21,
+      "photoId": 7,
+      "userId": 3,
+      "emoji": "❤️",
+      "createdAt": "2024-01-14T20:45:00Z"
+    },
+    {
+      "id": 22,
+      "photoId": 7,
+      "userId": 4,
+      "emoji": "👍",
+      "createdAt": "2024-01-14T21:30:00Z"
+    },
+    {
+      "id": 23,
+      "photoId": 7,
+      "userId": 5,
+      "emoji": "😍",
+      "createdAt": "2024-01-14T22:15:00Z"
+    }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "email": "alice@example.com",
+      "username": "alice_wonder",
+      "password": "$2b$10$rQZ8Kj9mNpL3vXyZ1aBcDeFgH2iJ4kL6mN8oP0qR2sT4uV6wX8yZ",
+      "avatarUrl": "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+      "fullName": "Alice Wonder",
+      "bio": "Photography enthusiast 📸",
+      "isVerified": true,
+      "isPrivate": false,
+      "followerCount": 1250,
+      "followingCount": 320,
+      "postCount": 45,
+      "createdAt": "2023-01-15T10:30:00Z",
+      "lastActiveAt": "2024-01-20T14:22:00Z"
+    },
+    {
+      "id": 2,
+      "email": "bob@example.com",
+      "username": "bob_photographer",
+      "password": "$2b$10$sRZ9Lk0nOqM4wYz2bCdEfGhI3jK5lM7nO9pQ1rS3tU5vW7xY9zA1b",
+      "avatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+      "fullName": "Bob Smith",
+      "bio": "Professional photographer | Travel lover",
+      "isVerified": false,
+      "isPrivate": true,
+      "followerCount": 890,
+      "followingCount": 156,
+      "postCount": 23,
+      "createdAt": "2023-03-22T08:15:00Z",
+      "lastActiveAt": "2024-01-20T16:45:00Z"
+    },
+    {
+      "id": 3,
+      "email": "charlie@example.com",
+      "username": "charlie_lens",
+      "password": "$2b$10$tSZ0Ml1pPrN5xZ3cDeFgHiJ4kL6mN8oP1qS4uV6wX8yZ0bC2eF4gH",
+      "avatarUrl": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+      "fullName": "Charlie Brown",
+      "bio": "Street photography | Urban explorer",
+      "isVerified": false,
+      "isPrivate": false,
+      "followerCount": 567,
+      "followingCount": 234,
+      "postCount": 78,
+      "createdAt": "2023-05-10T12:45:00Z",
+      "lastActiveAt": "2024-01-20T11:30:00Z"
+    },
+    {
+      "id": 4,
+      "email": "diana@example.com",
+      "username": "diana_art",
+      "password": "$2b$10$uTa1Nm2qQsO6yA4dEfGhIjK5lM7nO0pR2tV5wX8yZ1cD3fG5hI7jK",
+      "avatarUrl": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
+      "fullName": "Diana Prince",
+      "bio": "Art director | Creative soul 🎨",
+      "isVerified": true,
+      "isPrivate": false,
+      "followerCount": 2100,
+      "followingCount": 445,
+      "postCount": 67,
+      "createdAt": "2023-02-28T15:20:00Z",
+      "lastActiveAt": "2024-01-20T09:15:00Z"
+    },
+    {
+      "id": 5,
+      "email": "eve@example.com",
+      "username": "eve_nature",
+      "password": "$2b$10$vUb2On3rRtP7zB5eFgHiJkL6mN8oP1qS3uW6xY9zA2dE4gH6iJ8kL",
+      "avatarUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
+      "fullName": "Eve Green",
+      "bio": "Nature photographer | Wildlife lover 🌿",
+      "isVerified": false,
+      "isPrivate": true,
+      "followerCount": 432,
+      "followingCount": 89,
+      "postCount": 34,
+      "createdAt": "2023-07-05T09:30:00Z",
+      "lastActiveAt": "2024-01-20T13:45:00Z"
+    },
+    {
+      "id": 6,
+      "email": "admin@locket.com",
+      "username": "locket_admin",
+      "password": "$2b$10$wVc3Po4sSuP8zC6fGhIjLmN7oP2qR4tW7xY0zA3dF5gI7jK9lM1nO",
+      "avatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+      "fullName": "Locket Administrator",
+      "bio": "System Administrator | Content Moderator 🔧",
+      "isVerified": true,
+      "isPrivate": false,
+      "followerCount": 0,
+      "followingCount": 0,
+      "postCount": 0,
+      "role": "admin",
+      "permissions": [
+        "manage_users",
+        "manage_photos",
+        "moderate_content",
+        "view_analytics",
+        "system_settings"
+      ],
+      "createdAt": "2023-01-01T00:00:00Z",
+      "lastActiveAt": "2024-01-20T18:00:00Z"
+    }
+  ]
+}

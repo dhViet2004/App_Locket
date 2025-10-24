@@ -1,0 +1,165 @@
+{
+  "reactions": [
+    {
+      "id": 1,
+      "photoId": 1,
+      "userId": 2,
+      "emoji": "❤️",
+      "createdAt": "2024-01-20T18:45:00Z"
+    },
+    {
+      "id": 2,
+      "photoId": 1,
+      "userId": 3,
+      "emoji": "👍",
+      "createdAt": "2024-01-20T19:12:00Z"
+    },
+    {
+      "id": 3,
+      "photoId": 1,
+      "userId": 4,
+      "emoji": "😍",
+      "createdAt": "2024-01-20T20:30:00Z"
+    },
+    {
+      "id": 4,
+      "photoId": 2,
+      "userId": 1,
+      "emoji": "❤️",
+      "createdAt": "2024-01-19T08:20:00Z"
+    },
+    {
+      "id": 5,
+      "photoId": 2,
+      "userId": 3,
+      "emoji": "🔥",
+      "createdAt": "2024-01-19T09:15:00Z"
+    },
+    {
+      "id": 6,
+      "photoId": 2,
+      "userId": 5,
+      "emoji": "👍",
+      "createdAt": "2024-01-19T10:45:00Z"
+    },
+    {
+      "id": 7,
+      "photoId": 3,
+      "userId": 1,
+      "emoji": "🎨",
+      "createdAt": "2024-01-18T15:30:00Z"
+    },
+    {
+      "id": 8,
+      "photoId": 3,
+      "userId": 2,
+      "emoji": "❤️",
+      "createdAt": "2024-01-18T16:22:00Z"
+    },
+    {
+      "id": 9,
+      "photoId": 3,
+      "userId": 4,
+      "emoji": "😍",
+      "createdAt": "2024-01-18T17:15:00Z"
+    },
+    {
+      "id": 10,
+      "photoId": 4,
+      "userId": 1,
+      "emoji": "🌲",
+      "createdAt": "2024-01-17T17:30:00Z"
+    },
+    {
+      "id": 11,
+      "photoId": 4,
+      "userId": 2,
+      "emoji": "❤️",
+      "createdAt": "2024-01-17T18:45:00Z"
+    },
+    {
+      "id": 12,
+      "photoId": 4,
+      "userId": 3,
+      "emoji": "👍",
+      "createdAt": "2024-01-17T19:20:00Z"
+    },
+    {
+      "id": 13,
+      "photoId": 4,
+      "userId": 5,
+      "emoji": "😍",
+      "createdAt": "2024-01-17T20:10:00Z"
+    },
+    {
+      "id": 14,
+      "photoId": 5,
+      "userId": 1,
+      "emoji": "🦅",
+      "createdAt": "2024-01-16T12:15:00Z"
+    },
+    {
+      "id": 15,
+      "photoId": 5,
+      "userId": 2,
+      "emoji": "❤️",
+      "createdAt": "2024-01-16T13:30:00Z"
+    },
+    {
+      "id": 16,
+      "photoId": 5,
+      "userId": 3,
+      "emoji": "👍",
+      "createdAt": "2024-01-16T14:45:00Z"
+    },
+    {
+      "id": 17,
+      "photoId": 5,
+      "userId": 4,
+      "emoji": "😍",
+      "createdAt": "2024-01-16T15:20:00Z"
+    },
+    {
+      "id": 18,
+      "photoId": 6,
+      "userId": 2,
+      "emoji": "☕",
+      "createdAt": "2024-01-15T11:30:00Z"
+    },
+    {
+      "id": 19,
+      "photoId": 6,
+      "userId": 3,
+      "emoji": "❤️",
+      "createdAt": "2024-01-15T12:15:00Z"
+    },
+    {
+      "id": 20,
+      "photoId": 7,
+      "userId": 1,
+      "emoji": "🏙️",
+      "createdAt": "2024-01-14T20:00:00Z"
+    },
+    {
+      "id": 21,
+      "photoId": 7,
+      "userId": 3,
+      "emoji": "❤️",
+      "createdAt": "2024-01-14T20:45:00Z"
+    },
+    {
+      "id": 22,
+      "photoId": 7,
+      "userId": 4,
+      "emoji": "👍",
+      "createdAt": "2024-01-14T21:30:00Z"
+    },
+    {
+      "id": 23,
+      "photoId": 7,
+      "userId": 5,
+      "emoji": "😍",
+      "createdAt": "2024-01-14T22:15:00Z"
+    }
+  ]
+}

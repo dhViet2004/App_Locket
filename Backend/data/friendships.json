@@ -1,0 +1,69 @@
+{
+  "friendships": [
+    {
+      "id": 1,
+      "requesterId": 1,
+      "receiverId": 2,
+      "status": "accepted",
+      "createdAt": "2023-06-15T10:30:00Z",
+      "acceptedAt": "2023-06-15T14:22:00Z"
+    },
+    {
+      "id": 2,
+      "requesterId": 1,
+      "receiverId": 3,
+      "status": "accepted",
+      "createdAt": "2023-08-20T09:15:00Z",
+      "acceptedAt": "2023-08-20T16:45:00Z"
+    },
+    {
+      "id": 3,
+      "requesterId": 2,
+      "receiverId": 4,
+      "status": "pending",
+      "createdAt": "2024-01-18T11:20:00Z",
+      "acceptedAt": null
+    },
+    {
+      "id": 4,
+      "requesterId": 3,
+      "receiverId": 4,
+      "status": "accepted",
+      "createdAt": "2023-11-10T13:45:00Z",
+      "acceptedAt": "2023-11-11T08:30:00Z"
+    },
+    {
+      "id": 5,
+      "requesterId": 4,
+      "receiverId": 5,
+      "status": "accepted",
+      "createdAt": "2023-12-05T15:20:00Z",
+      "acceptedAt": "2023-12-06T10:15:00Z"
+    },
+    {
+      "id": 6,
+      "requesterId": 1,
+      "receiverId": 5,
+      "status": "pending",
+      "createdAt": "2024-01-19T16:30:00Z",
+      "acceptedAt": null
+    },
+    {
+      "id": 7,
+      "requesterId": 2,
+      "receiverId": 3,
+      "status": "blocked",
+      "createdAt": "2023-09-15T12:00:00Z",
+      "acceptedAt": null,
+      "blockedAt": "2023-09-20T14:30:00Z"
+    },
+    {
+      "id": 8,
+      "requesterId": 5,
+      "receiverId": 1,
+      "status": "accepted",
+      "createdAt": "2023-10-12T08:45:00Z",
+      "acceptedAt": "2023-10-12T20:15:00Z"
+    }
+  ]
+}

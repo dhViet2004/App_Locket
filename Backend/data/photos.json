@@ -1,0 +1,100 @@
+{
+  "photos": [
+    {
+      "id": 1,
+      "userId": 1,
+      "imageUrl": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
+      "caption": "Beautiful sunset at the beach today! 🌅 #sunset #beach #photography",
+      "location": "Malibu Beach, CA",
+      "tags": ["sunset", "beach", "photography", "nature"],
+      "isPublic": true,
+      "viewCount": 245,
+      "createdAt": "2024-01-20T18:30:00Z",
+      "updatedAt": "2024-01-20T18:30:00Z"
+    },
+    {
+      "id": 2,
+      "userId": 2,
+      "imageUrl": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&h=600&fit=crop",
+      "caption": "Morning hike in the mountains. The view was absolutely breathtaking! 🏔️",
+      "location": "Rocky Mountains, CO",
+      "tags": ["mountains", "hiking", "nature", "adventure"],
+      "isPublic": true,
+      "viewCount": 189,
+      "createdAt": "2024-01-19T07:15:00Z",
+      "updatedAt": "2024-01-19T07:15:00Z"
+    },
+    {
+      "id": 3,
+      "userId": 3,
+      "imageUrl": "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&h=600&fit=crop",
+      "caption": "Street art in downtown. Love the vibrant colors! 🎨",
+      "location": "Downtown LA",
+      "tags": ["streetart", "urban", "colorful", "art"],
+      "isPublic": true,
+      "viewCount": 156,
+      "createdAt": "2024-01-18T14:22:00Z",
+      "updatedAt": "2024-01-18T14:22:00Z"
+    },
+    {
+      "id": 4,
+      "userId": 4,
+      "imageUrl": "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&h=600&fit=crop",
+      "caption": "Golden hour in the forest. Nature never fails to amaze me 🌲",
+      "location": "Redwood National Park",
+      "tags": ["forest", "goldenhour", "nature", "trees"],
+      "isPublic": true,
+      "viewCount": 312,
+      "createdAt": "2024-01-17T16:45:00Z",
+      "updatedAt": "2024-01-17T16:45:00Z"
+    },
+    {
+      "id": 5,
+      "userId": 5,
+      "imageUrl": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
+      "caption": "Wildlife photography session. This eagle was so majestic! 🦅",
+      "location": "Yellowstone National Park",
+      "tags": ["wildlife", "eagle", "nature", "photography"],
+      "isPublic": true,
+      "viewCount": 278,
+      "createdAt": "2024-01-16T11:30:00Z",
+      "updatedAt": "2024-01-16T11:30:00Z"
+    },
+    {
+      "id": 6,
+      "userId": 1,
+      "imageUrl": "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=600&fit=crop",
+      "caption": "Coffee shop vibes ☕ Perfect place to work and relax",
+      "location": "Local Coffee Shop",
+      "tags": ["coffee", "work", "relax", "lifestyle"],
+      "isPublic": true,
+      "viewCount": 134,
+      "createdAt": "2024-01-15T10:20:00Z",
+      "updatedAt": "2024-01-15T10:20:00Z"
+    },
+    {
+      "id": 7,
+      "userId": 2,
+      "imageUrl": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
+      "caption": "Urban exploration in the city. Found this amazing rooftop view! 🏙️",
+      "location": "Downtown NYC",
+      "tags": ["urban", "city", "rooftop", "skyline"],
+      "isPublic": true,
+      "viewCount": 203,
+      "createdAt": "2024-01-14T19:15:00Z",
+      "updatedAt": "2024-01-14T19:15:00Z"
+    },
+    {
+      "id": 8,
+      "userId": 3,
+      "imageUrl": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
+      "caption": "Black and white photography. Sometimes less is more 📸",
+      "location": "Local Park",
+      "tags": ["blackandwhite", "minimalist", "photography", "art"],
+      "isPublic": false,
+      "viewCount": 67,
+      "createdAt": "2024-01-13T15:45:00Z",
+      "updatedAt": "2024-01-13T15:45:00Z"
+    }
+  ]
+}
