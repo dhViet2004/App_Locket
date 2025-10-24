@@ -1,7 +1,8 @@
-import { Text, View, StyleSheet, TouchableOpacity, TextInput, SafeAreaView } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, ScrollView } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useState } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function NameScreen() {
   const [firstName, setFirstName] = useState("");
@@ -9,8 +10,8 @@ export default function NameScreen() {
 
   const handleContinue = () => {
     if (firstName.trim() && lastName.trim()) {
-      // Complete registration and navigate to main app
-      router.replace("/");
+      // Navigate to username screen
+      router.push("/register/username");
     }
   };
 
@@ -20,18 +21,29 @@ export default function NameScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" backgroundColor="#000000" />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior="padding"
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Main Content */}
-      <View style={styles.content}>
+        {/* Main Content */}
+        <View style={styles.content}>
         <Text style={styles.title}>Tên của bạn là gì?</Text>
         <Text style={styles.subtitle}>Điều này sẽ giúp bạn bè nhận ra bạn</Text>
         
@@ -59,19 +71,21 @@ export default function NameScreen() {
             autoCorrect={false}
           />
         </View>
-      </View>
+        </View>
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={[styles.continueButton, isFormValid ? styles.continueButtonActive : styles.continueButtonInactive]}
-          onPress={handleContinue}
-          disabled={!isFormValid}
-        >
-          <Text style={styles.continueButtonText}>Hoàn thành</Text>
-          <Text style={styles.arrowIcon}>→</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Footer */}
+        <View style={styles.footer}>
+          <TouchableOpacity 
+            style={[styles.continueButton, isFormValid ? styles.continueButtonActive : styles.continueButtonInactive]}
+            onPress={handleContinue}
+            disabled={!isFormValid}
+          >
+            <Text style={styles.continueButtonText}>Tiếp tục</Text>
+            <Text style={styles.arrowIcon}>→</Text>
+          </TouchableOpacity>
+        </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -80,6 +94,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   header: {
     flexDirection: 'row',
@@ -145,19 +168,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   continueButtonActive: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#FFD700',
   },
   continueButtonInactive: {
-    backgroundColor: '#0A0A0A',
+    backgroundColor: '#333333',
   },
   continueButtonText: {
-    color: '#FFFFFF',
+    color: '#000000',
     fontSize: 16,
     fontWeight: '600',
     marginRight: 8,
   },
   arrowIcon: {
-    color: '#FFFFFF',
+    color: '#000000',
     fontSize: 16,
     fontWeight: 'bold',
   },

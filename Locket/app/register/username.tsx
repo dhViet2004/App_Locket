@@ -1,26 +1,45 @@
-import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, ScrollView } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function PasswordScreen() {
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+export default function UsernameScreen() {
+  const [username, setUsername] = useState("");
+  const [isValidating, setIsValidating] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(false);
 
-  // Password validation function
-  const isValidPassword = (password: string) => {
-    return password.length >= 8;
+  // Simulate username validation
+  const validateUsername = async (username: string) => {
+    if (username.length < 3) return false;
+    
+    setIsValidating(true);
+    // Simulate API call
+    setTimeout(() => {
+      setIsAvailable(true);
+      setIsValidating(false);
+    }, 1000);
   };
 
-  const handleContinue = () => {
-    if (isValidPassword(password) && password === confirmPassword) {
-      // Navigate to next step or complete registration
-      router.push("/register/name");
+  const handleUsernameChange = (text: string) => {
+    setUsername(text);
+    setIsAvailable(false);
+    if (text.length >= 3) {
+      validateUsername(text);
     }
   };
 
-  const isFormValid = isValidPassword(password) && password === confirmPassword;
+  const handleContinue = () => {
+    if (isAvailable && username.trim()) {
+      // Navigate to confirmation screen with username
+      router.push({
+        pathname: "/register/confirmation",
+        params: { username: username.trim() }
+      });
+    }
+  };
+
+  const isFormValid = isAvailable && username.trim();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -49,41 +68,37 @@ export default function PasswordScreen() {
 
         {/* Main Content */}
         <View style={styles.content}>
-          <Text style={styles.title}>Tạo mật khẩu</Text>
-          <Text style={styles.subtitle}>Mật khẩu phải có ít nhất 8 ký tự</Text>
+          <Text style={styles.title}>Thêm một tên người dùng</Text>
           
           <View style={styles.inputContainer}>
             <TextInput
-              style={styles.input}
-              placeholder="Mật khẩu"
+              style={[styles.input, isAvailable && styles.inputValid]}
+              placeholder="Tên người dùng"
               placeholderTextColor="#666666"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
+              value={username}
+              onChangeText={handleUsernameChange}
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus
             />
           </View>
 
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Xác nhận mật khẩu"
-              placeholderTextColor="#666666"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          {password && !isValidPassword(password) && (
-            <Text style={styles.errorText}>Mật khẩu phải có ít nhất 8 ký tự</Text>
+          {/* Status Feedback */}
+          {isValidating && (
+            <View style={styles.statusContainer}>
+              <Text style={styles.validatingText}>Đang kiểm tra...</Text>
+            </View>
           )}
-          {password && confirmPassword && password !== confirmPassword && (
-            <Text style={styles.errorText}>Mật khẩu không khớp</Text>
+          
+          {isAvailable && !isValidating && (
+            <View style={styles.statusContainer}>
+              <Text style={styles.heartIcon}>💛</Text>
+              <Text style={styles.availableText}>Có sẵn!</Text>
+            </View>
+          )}
+
+          {username.length > 0 && username.length < 3 && (
+            <Text style={styles.errorText}>Tên người dùng phải có ít nhất 3 ký tự</Text>
           )}
         </View>
 
@@ -94,8 +109,9 @@ export default function PasswordScreen() {
             onPress={handleContinue}
             disabled={!isFormValid}
           >
-            <Text style={styles.continueButtonText}>Tiếp tục</Text>
-            <Text style={styles.arrowIcon}>→</Text>
+            <Text style={[styles.continueButtonText, isFormValid ? styles.continueButtonTextActive : styles.continueButtonTextInactive]}>
+              Tiếp tục
+            </Text>
           </TouchableOpacity>
         </View>
         </ScrollView>
@@ -147,13 +163,8 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 8,
-    lineHeight: 34,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#999999',
     marginBottom: 40,
+    textAlign: 'center',
   },
   inputContainer: {
     marginBottom: 20,
@@ -168,9 +179,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
   },
+  inputValid: {
+    borderColor: '#FFD700',
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  heartIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  availableText: {
+    color: '#FFD700',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  validatingText: {
+    color: '#999999',
+    fontSize: 16,
+  },
   errorText: {
     color: '#FF4444',
     fontSize: 14,
+    textAlign: 'center',
     marginTop: -10,
     marginBottom: 10,
   },
@@ -179,13 +213,11 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   continueButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 12,
-    marginBottom: 20,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   continueButtonActive: {
     backgroundColor: '#FFD700',
@@ -194,14 +226,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#333333',
   },
   continueButtonText: {
-    color: '#000000',
     fontSize: 16,
     fontWeight: '600',
-    marginRight: 8,
   },
-  arrowIcon: {
+  continueButtonTextActive: {
     color: '#000000',
-    fontSize: 16,
-    fontWeight: 'bold',
+  },
+  continueButtonTextInactive: {
+    color: '#666666',
   },
 });

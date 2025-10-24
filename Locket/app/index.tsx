@@ -1,12 +1,13 @@
 import { Text, View, StyleSheet, TouchableOpacity, Dimensions, Image } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get('window');
 
 export default function Index() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar style="light" backgroundColor="#000000" />
       
       {/* Phone Illustration */}
@@ -47,7 +48,7 @@ export default function Index() {
           <Text style={styles.secondaryLinkText}>Đăng nhập</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
