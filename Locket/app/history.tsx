@@ -13,13 +13,14 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function HistoryScreen() {
   const router = useRouter();
+  const { newPhoto } = useLocalSearchParams();
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Smileys & People');
@@ -31,7 +32,7 @@ export default function HistoryScreen() {
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   // Mock data for history feed - matching the sample image
-  const historyData = [
+  const baseHistoryData = [
     {
       id: '1',
       image: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=600&fit=crop&crop=center',
@@ -63,6 +64,22 @@ export default function HistoryScreen() {
       }
     }
   ];
+
+  // Thêm ảnh mới vào đầu danh sách nếu có
+  const getHistoryData = () => {
+    if (newPhoto) {
+      try {
+        const parsedNewPhoto = JSON.parse(newPhoto as string);
+        return [parsedNewPhoto, ...baseHistoryData];
+      } catch (error) {
+        console.error('Error parsing new photo:', error);
+        return baseHistoryData;
+      }
+    }
+    return baseHistoryData;
+  };
+
+  const historyData = getHistoryData();
 
   // Emoji categories for the picker
   const emojiCategories = {

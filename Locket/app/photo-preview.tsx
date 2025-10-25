@@ -49,6 +49,32 @@ export default function PhotoPreviewScreen() {
 
   const handleSend = () => {
     // Logic gửi ảnh
+    console.log('Gửi ảnh:', photoUri);
+    console.log('Tin nhắn:', messageText);
+    console.log('Người nhận:', selectedRecipients);
+    
+    // Tạo object ảnh mới để thêm vào history
+    const newPhoto = {
+      id: Date.now().toString(), // ID duy nhất
+      image: photoUri as string,
+      message: messageText || '',
+      sender: {
+        name: 'Bạn', // Tên người gửi (có thể lấy từ user data)
+        avatar: 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761231281/taskmanagement/avatars/a0hsc7oncibdgnvhbgbp.jpg', // Avatar của bạn
+        time: 'Vừa xong'
+      },
+      recipients: selectedRecipients,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Lưu ảnh vào AsyncStorage hoặc state management
+    // Ở đây chúng ta sẽ sử dụng router để chuyển hướng và truyền data
+    router.push({
+      pathname: '/history',
+      params: {
+        newPhoto: JSON.stringify(newPhoto)
+      }
+    });
   };
 
 
