@@ -16,7 +16,10 @@ export default function RootLayout() {
       <Stack.Screen 
         name="index" 
         options={{ 
-          headerShown: false 
+          headerShown: false,
+          navigationBarColor: '#000000',
+          statusBarStyle: 'light',
+          statusBarBackgroundColor: '#000000'
         }} 
       />
       <Stack.Screen 
@@ -55,10 +58,40 @@ export default function RootLayout() {
         }} 
       />
       <Stack.Screen 
+        name="login/password" 
+        options={{ 
+          headerShown: false,
+          presentation: 'modal'
+        }} 
+      />
+      <Stack.Screen 
+        name="login/phone" 
+        options={{ 
+          headerShown: false,
+          presentation: 'modal'
+        }} 
+      />
+      <Stack.Screen 
+        name="login/otp" 
+        options={{ 
+          headerShown: false,
+          presentation: 'modal'
+        }} 
+      />
+      <Stack.Screen 
         name="photo-preview" 
         options={{ 
           headerShown: false,
           presentation: 'modal'
+        }} 
+      />
+      <Stack.Screen 
+        name="home" 
+        options={{ 
+          headerShown: false,
+          navigationBarColor: '#000000',
+          statusBarStyle: 'light',
+          statusBarBackgroundColor: '#000000'
         }} 
       />
       </Stack>

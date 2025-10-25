@@ -1,9 +1,10 @@
 import { Text, View, StyleSheet, TouchableOpacity, Dimensions, ScrollView, TextInput, Modal, PanResponder, Animated } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, CameraType, FlashMode } from "expo-camera";
 import { useState, useRef } from "react";
+import * as ScreenOrientation from 'expo-screen-orientation';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -33,16 +34,25 @@ export default function HomeScreen() {
   const handleTakePicture = async () => {
     if (cameraRef.current && isCameraReady) {
       try {
+        // Get current orientation
+        const orientation = await ScreenOrientation.getOrientationAsync();
+        console.log('Current orientation:', orientation);
+        
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.8,
           base64: false,
+          skipProcessing: false, // Ensure proper orientation handling
+          exif: true, // Include EXIF data for proper orientation
         });
         console.log('Photo taken:', photo.uri);
         
-        // Navigate to photo preview screen with photo URI
+        // Navigate to photo preview screen with photo URI and orientation
         router.push({
           pathname: '/photo-preview',
-          params: { photoUri: photo.uri }
+          params: { 
+            photoUri: photo.uri,
+            orientation: orientation.toString()
+          }
         });
       } catch (error) {
         console.error('Error taking picture:', error);
@@ -122,13 +132,20 @@ export default function HomeScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" />
+      <Stack.Screen 
+        options={{ 
+          headerShown: false,
+          navigationBarColor: '#000000',
+          statusBarStyle: 'light',
+          statusBarBackgroundColor: '#000000'
+        }} 
+      />
+      <StatusBar style="light" backgroundColor="#000000" />
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           {/* Profile Icon */}
-          <TouchableOpacity style={styles.headerButton}>
+          <TouchableOpacity style={styles.headerButton} onPress={() => router.push('/profile')}>
             <View style={styles.profileIcon}>
               <FontAwesome5 name="user-circle" size={24} color="white" />
             </View>
@@ -158,6 +175,7 @@ export default function HomeScreen() {
               facing={cameraType}
               flash={flashMode}
               onCameraReady={() => setIsCameraReady(true)}
+              enableTorch={flashMode === 'on'}
             />
           </View>
 
@@ -186,10 +204,12 @@ export default function HomeScreen() {
           </View>
 
           {/* History Label */}
-          <View style={styles.historyContainer}>
-            <Text style={styles.historyText}>Lịch sử</Text>
-            <MaterialIcons name="keyboard-arrow-down" size={34} color="white" />
-          </View>
+          <Link href="/history" asChild>
+            <TouchableOpacity style={styles.historyContainer}>
+              <Text style={styles.historyText}>Lịch sử</Text>
+              <MaterialIcons name="keyboard-arrow-down" size={34} color="white" />
+            </TouchableOpacity>
+          </Link>
         </View>
 
         {/* Friends Modal */}
@@ -338,7 +358,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: '#000000',
   },
   headerButton: {
     width: 40,
@@ -402,6 +422,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 40,
     paddingVertical: 20,
+    backgroundColor: '#000000',
   },
   controlButton: {
     width: 50,
@@ -443,6 +464,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 20,
     marginBottom:39,
+    backgroundColor: '#000000',
   },
   historyText: {
     color: '#FFFFFF',

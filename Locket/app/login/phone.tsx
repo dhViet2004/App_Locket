@@ -1,37 +1,24 @@
 import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from "react-native";
-import { StatusBar } from "expo-status-bar";
-import { router, Stack } from "expo-router";
-import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-export default function LoginScreen() {
-  const [email, setEmail] = useState("");
+import { StatusBar } from "expo-status-bar";
+import { router } from "expo-router";
+import { useState } from "react";
+
+export default function LoginPhoneScreen() {
+  const [phoneNumber, setPhoneNumber] = useState("");
 
   const handleContinue = () => {
-    if (email.trim()) {
-      // Navigate to password screen
-      router.push("/login/password");
+    if (phoneNumber.trim()) {
+      // Navigate to OTP verification
+      router.push("/login/otp");
     }
   };
 
-  const handleUsePhone = () => {
-    // Navigate to phone login
-    router.push("/login/phone");
-  };
-
-  const isFormValid = email.trim();
+  const isFormValid = phoneNumber.trim();
 
   return (
-    <>
-      <Stack.Screen 
-        options={{ 
-          headerShown: false,
-          navigationBarColor: '#000000',
-          statusBarStyle: 'light',
-          statusBarBackgroundColor: '#000000'
-        }} 
-      />
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="light" backgroundColor="#000000" />
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="light" backgroundColor="#000000" />
       
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
@@ -50,27 +37,29 @@ export default function LoginScreen() {
 
         {/* Main Content */}
         <View style={styles.content}>
-          <Text style={styles.title}>Email của bạn là gì?</Text>
+          <Text style={styles.title}>Số điện thoại của bạn là gì?</Text>
           
           <View style={styles.inputContainer}>
+            <View style={styles.countryCodeContainer}>
+              <Text style={styles.countryFlag}>🇻🇳</Text>
+              <Text style={styles.countryCode}>+84</Text>
+            </View>
             <TextInput
               style={styles.input}
-              placeholder="Địa chỉ email"
+              placeholder="Số điện thoại"
               placeholderTextColor="#999999"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              keyboardType="phone-pad"
               autoFocus
             />
           </View>
 
           <TouchableOpacity 
-            style={styles.phoneButton}
-            onPress={handleUsePhone}
+            style={styles.emailButton}
+            onPress={() => router.push("/login")}
           >
-            <Text style={styles.phoneButtonText}>Sử dụng số điện thoại</Text>
+            <Text style={styles.emailButtonText}>Sử dụng email thay cho cách này</Text>
           </TouchableOpacity>
         </View>
 
@@ -91,8 +80,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-      </SafeAreaView>
-    </>
+    </SafeAreaView>
   );
 }
 
@@ -139,31 +127,43 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: 20,
-  },
-  input: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#1A1A1A',
     borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#333333',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    fontSize: 16,
-    color: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#333333',
   },
-  phoneButton: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 25,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignSelf: 'center',
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#333333',
+  countryCodeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 15,
   },
-  phoneButtonText: {
+  countryFlag: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  countryCode: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '500',
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#FFFFFF',
+    padding: 0,
+  },
+  emailButton: {
+    alignSelf: 'center',
+    marginTop: 20,
+  },
+  emailButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    textDecorationLine: 'underline',
   },
   footer: {
     paddingHorizontal: 20,
