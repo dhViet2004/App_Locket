@@ -35,31 +35,31 @@ export default function HistoryScreen() {
   const baseHistoryData = [
     {
       id: '1',
-      image: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=600&fit=crop&crop=center',
-      message: 'm đúng k Tuyết',
+      image: 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761379944/hotgirl-tran-ha-linh-bi-boc-tran-qua-khu-lieu-co-an-o-nhu-thoi-nguyen-thuy-them-1-clip-gay-bao-ba6-6951964_lnvtpy.png',
+      message: 'Hi mấy anh',
       sender: {
-        name: 'be',
-        avatar: 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761231281/taskmanagement/avatars/a0hsc7oncibdgnvhbgbp.jpg',
+        name: 'Trần Hà Linh',
+        avatar: 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761379944/hotgirl-tran-ha-linh-bi-boc-tran-qua-khu-lieu-co-an-o-nhu-thoi-nguyen-thuy-them-1-clip-gay-bao-ba6-6951964_lnvtpy.png',
         time: '3h'
       }
     },
     {
       id: '2',
-      image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=600&fit=crop&crop=center',
+      image: 'https://tse3.mm.bing.net/th/id/OIP.ynnE-XdeMpEAe4DlKhOgJAHaHa?rs=1&pid=ImgDetMain&o=7&rm=3',
       message: 'Chào buổi sáng!',
       sender: {
-        name: 'Alice',
-        avatar: 'https://via.placeholder.com/40x40/666/fff?text=A',
+        name: 'Nguyễn Mạnh Cường',
+        avatar: 'https://tse3.mm.bing.net/th/id/OIP.ynnE-XdeMpEAe4DlKhOgJAHaHa?rs=1&pid=ImgDetMain&o=7&rm=3',
         time: '5h'
       }
     },
     {
       id: '3',
-      image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=600&fit=crop&crop=center',
+      image: 'https://tse2.mm.bing.net/th/id/OIP.hfSgSQHhVVPBTCDtJwM0FAHaJ4?rs=1&pid=ImgDetMain&o=7&rm=3',
       message: 'Hôm nay trời đẹp quá',
       sender: {
-        name: 'Bob',
-        avatar: 'https://via.placeholder.com/40x40/666/fff?text=B',
+        name: 'Đoàn Thị Bích Ngọc',
+        avatar: 'https://tse2.mm.bing.net/th/id/OIP.hfSgSQHhVVPBTCDtJwM0FAHaJ4?rs=1&pid=ImgDetMain&o=7&rm=3',
         time: '1d'
       }
     }
