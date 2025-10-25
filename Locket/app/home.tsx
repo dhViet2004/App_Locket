@@ -10,6 +10,7 @@ import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -79,6 +80,26 @@ export default function HomeScreen() {
   const closeFriendsModal = () => {
     setShowFriendsModal(false);
     modalHeight.setValue(screenHeight * 0.6);
+  };
+
+  // Gesture handlers for navigation
+  const handleGestureEvent = (event: any) => {
+    // Track gesture progress if needed
+  };
+
+  const handleGestureStateChange = (event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationX, translationY, velocityX, velocityY } = event.nativeEvent;
+      
+      // Swipe down to go to history
+      if (translationY > 50 && velocityY > 500) {
+        router.push('/history');
+      }
+      // Swipe left to go to profile
+      else if (translationX < -50 && velocityX < -500) {
+        router.push('/profile');
+      }
+    }
   };
 
   // PanResponder for modal drag
@@ -166,51 +187,56 @@ export default function HomeScreen() {
         </View>
 
         {/* Main Content Area */}
-        <View style={styles.mainContent}>
-          {/* Camera Viewfinder */}
-          <View style={styles.cameraContainer}>
-            <CameraView
-              ref={cameraRef}
-              style={styles.camera}
-              facing={cameraType}
-              flash={flashMode}
-              onCameraReady={() => setIsCameraReady(true)}
-              enableTorch={flashMode === 'on'}
-            />
-          </View>
-
-          {/* Camera Controls Footer */}
-          <View style={styles.footer}>
-            {/* Flash Button */}
-            <TouchableOpacity style={styles.controlButton} onPress={toggleFlash}>
-              <MaterialCommunityIcons 
-                name="flash-outline" 
-                size={40} 
-                color={flashMode === 'on' ? '#FF8C00' : 'white'} 
+        <PanGestureHandler
+          onGestureEvent={handleGestureEvent}
+          onHandlerStateChange={handleGestureStateChange}
+        >
+          <View style={styles.mainContent}>
+            {/* Camera Viewfinder */}
+            <View style={styles.cameraContainer}>
+              <CameraView
+                ref={cameraRef}
+                style={styles.camera}
+                facing={cameraType}
+                flash={flashMode}
+                onCameraReady={() => setIsCameraReady(true)}
+                enableTorch={flashMode === 'on'}
               />
-            </TouchableOpacity>
+            </View>
 
-            {/* Shutter Button */}
-            <TouchableOpacity style={styles.shutterButton} onPress={handleTakePicture}>
-              <View style={styles.shutterButtonInner}>
-                <View style={styles.shutterButtonCore} />
-              </View>
-            </TouchableOpacity>
+            {/* Camera Controls Footer */}
+            <View style={styles.footer}>
+              {/* Flash Button */}
+              <TouchableOpacity style={styles.controlButton} onPress={toggleFlash}>
+                <MaterialCommunityIcons 
+                  name="flash-outline" 
+                  size={40} 
+                  color={flashMode === 'on' ? '#FF8C00' : 'white'} 
+                />
+              </TouchableOpacity>
 
-            {/* Camera Flip Button */}
-            <TouchableOpacity style={styles.controlButton} onPress={toggleCameraType}>
-              <FontAwesome name="refresh" size={34} color="white" />
-            </TouchableOpacity>
+              {/* Shutter Button */}
+              <TouchableOpacity style={styles.shutterButton} onPress={handleTakePicture}>
+                <View style={styles.shutterButtonInner}>
+                  <View style={styles.shutterButtonCore} />
+                </View>
+              </TouchableOpacity>
+
+              {/* Camera Flip Button */}
+              <TouchableOpacity style={styles.controlButton} onPress={toggleCameraType}>
+                <FontAwesome name="refresh" size={34} color="white" />
+              </TouchableOpacity>
+            </View>
+
+            {/* History Label */}
+            <Link href="/history" asChild>
+              <TouchableOpacity style={styles.historyContainer}>
+                <Text style={styles.historyText}>Lịch sử</Text>
+                <MaterialIcons name="keyboard-arrow-down" size={34} color="white" />
+              </TouchableOpacity>
+            </Link>
           </View>
-
-          {/* History Label */}
-          <Link href="/history" asChild>
-            <TouchableOpacity style={styles.historyContainer}>
-              <Text style={styles.historyText}>Lịch sử</Text>
-              <MaterialIcons name="keyboard-arrow-down" size={34} color="white" />
-            </TouchableOpacity>
-          </Link>
-        </View>
+        </PanGestureHandler>
 
         {/* Friends Modal */}
         <Modal
