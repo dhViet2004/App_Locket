@@ -7,6 +7,15 @@ export const env = {
   MONGO_URI: process.env.MONGO_URI || 'mongodb://localhost:27017/locket',
   JWT_SECRET: process.env.JWT_SECRET || 'change_me',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || '',
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || '',
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || '',
+  // Email config (dùng Gmail SMTP miễn phí)
+  EMAIL_HOST: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  EMAIL_PORT: parseInt(process.env.EMAIL_PORT || '587', 10),
+  EMAIL_USER: process.env.EMAIL_USER || '',
+  EMAIL_PASS: process.env.EMAIL_PASS || '', // App password cho Gmail
+  EMAIL_FROM: process.env.EMAIL_FROM || process.env.EMAIL_USER || '',
 };
 
 // eslint-disable-next-line no-console

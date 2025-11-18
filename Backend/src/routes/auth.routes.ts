@@ -20,8 +20,23 @@ const loginSchema = z.object({
 	}),
 });
 
+const sendOTPSchema = z.object({
+	body: z.object({
+		identifier: z.string().min(1), // phone hoặc email
+	}),
+});
+
+const verifyOTPSchema = z.object({
+	body: z.object({
+		identifier: z.string().min(1), // phone hoặc email
+		code: z.string().length(6).regex(/^\d{6}$/),
+	}),
+});
+
 router.post('/register', validate(registerSchema), authCtrl.register);
 router.post('/login', validate(loginSchema), authCtrl.login);
+router.post('/send-otp', validate(sendOTPSchema), authCtrl.sendOTP);
+router.post('/verify-otp', validate(verifyOTPSchema), authCtrl.verifyOTP);
 
 export default router;
 
