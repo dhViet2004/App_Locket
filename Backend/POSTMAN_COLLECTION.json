@@ -254,6 +254,65 @@
               "path": ["api", "posts"]
             }
           }
+        },
+        {
+          "name": "Suggest Caption (File Upload)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/posts/suggest-caption",
+              "host": ["{{base_url}}"],
+              "path": ["api", "posts", "suggest-caption"]
+            },
+            "description": "Gợi ý caption cho ảnh sử dụng Groq AI.\n\n**Cách 1: Gửi file (multipart/form-data)**\n- Gửi ảnh dưới dạng file upload\n- Backend sẽ tự động nén và gửi lên Groq API\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Caption suggested successfully\",\n  \"data\": {\n    \"caption\": \"Một buổi sáng đẹp trời...\"\n  }\n}\n```"
+          }
+        },
+        {
+          "name": "Suggest Caption (Base64)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"base64Image\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/posts/suggest-caption",
+              "host": ["{{base_url}}"],
+              "path": ["api", "posts", "suggest-caption"]
+            },
+            "description": "Gợi ý caption cho ảnh sử dụng Groq AI.\n\n**Cách 2: Gửi Base64 (JSON)**\n- Gửi ảnh dưới dạng base64 string\n- Format: `data:image/jpeg;base64,<base64_string>` hoặc chỉ `<base64_string>`\n- Backend sẽ tự động parse và xử lý\n\n**Request Body:**\n```json\n{\n  \"base64Image\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}\n```\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Caption suggested successfully\",\n  \"data\": {\n    \"caption\": \"Một buổi sáng đẹp trời...\"\n  }\n}\n```\n\n**Lưu ý:**\n- Cần có GROQ_API_KEY trong .env để hoạt động\n- Ảnh sẽ được tự động nén xuống max 1024px trước khi gửi lên Groq\n- Caption được generate bằng tiếng Việt, phù hợp với mạng xã hội"
+          }
         }
       ]
     },

@@ -18,6 +18,8 @@ export const env = {
   EMAIL_FROM: process.env.EMAIL_FROM || process.env.EMAIL_USER || '',
   // NSFW Moderation config
   NSFW_ENABLED: process.env.NSFW_ENABLED !== 'false', // Default: true, set to 'false' to disable
+  // Groq API config (for caption suggestion)
+  GROQ_API_KEY: process.env.GROQ_API_KEY || '',
 };
 
 // eslint-disable-next-line no-console

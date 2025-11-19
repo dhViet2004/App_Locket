@@ -58,6 +58,18 @@ const upload = multer({
 router.post('/', requireAuth, upload.single('image'), checkNSFW, postController.create);
 
 /**
+ * POST /posts/suggest-caption
+ * Gợi ý caption cho ảnh sử dụng Groq AI
+ * Body (option 1): multipart/form-data
+ *   - image: File (required)
+ * Body (option 2): application/json
+ *   - base64Image: string (required) - Base64 encoded image với prefix data:image/...;base64,
+ * 
+ * Response: { success: true, data: { caption: string } }
+ */
+router.post('/suggest-caption', requireAuth, upload.single('image'), postController.suggestCaption);
+
+/**
  * POST /posts/:id/react
  * Thêm hoặc cập nhật reaction cho một post
  * Body: { type: ReactionType }
