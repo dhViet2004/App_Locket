@@ -9,6 +9,7 @@
 6. [Reactions](#reactions)
 7. [Comments](#comments)
 8. [Recap Video](#recap-video)
+9. [Chat](#chat)
 
 ---
 

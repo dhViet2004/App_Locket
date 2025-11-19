@@ -1,6 +1,7 @@
 import { Router, Request } from 'express';
 import multer, { FileFilterCallback } from 'multer';
 import { requireAuth } from '../middlewares/auth.middleware';
+import { checkNSFW } from '../middlewares/nsfw.middleware';
 import * as postController from '../controllers/post.controller';
 import * as reactionController from '../controllers/reaction.controller';
 import * as commentController from '../controllers/comment.controller';
@@ -47,8 +48,14 @@ const upload = multer({
  *   - lat: number (optional)
  *   - lng: number (optional)
  *   - visibility: 'friends' | 'private' (optional, default: 'friends')
+ * 
+ * Middleware order:
+ * 1. requireAuth - Kiểm tra authentication
+ * 2. upload.single('image') - Nhận file từ multer
+ * 3. checkNSFW - Kiểm tra nội dung nhạy cảm
+ * 4. postController.create - Tạo bài viết
  */
-router.post('/', requireAuth, upload.single('image'), postController.create);
+router.post('/', requireAuth, upload.single('image'), checkNSFW, postController.create);
 
 /**
  * POST /posts/:id/react

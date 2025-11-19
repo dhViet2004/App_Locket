@@ -9,8 +9,11 @@ export async function connectDB() {
   }
   try {
     await mongoose.connect(env.MONGO_URI);
+    const dbName = mongoose.connection.db?.databaseName || 'unknown';
     // eslint-disable-next-line no-console
-    console.log('MongoDB connected');
+    console.log(`MongoDB connected to database: "${dbName}"`);
+    // eslint-disable-next-line no-console
+    console.log(`Connection URI: ${env.MONGO_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')}`);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('MongoDB connection error', err);

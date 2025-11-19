@@ -4,7 +4,7 @@ dotenv.config();
 export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: parseInt(process.env.PORT || '4000', 10),
-  MONGO_URI: process.env.MONGO_URI || 'mongodb://localhost:27017/locket',
+  MONGO_URI: process.env.MONGO_URI ,
   JWT_SECRET: process.env.JWT_SECRET || 'change_me',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
   CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || '',
@@ -16,6 +16,8 @@ export const env = {
   EMAIL_USER: process.env.EMAIL_USER || '',
   EMAIL_PASS: process.env.EMAIL_PASS || '', // App password cho Gmail
   EMAIL_FROM: process.env.EMAIL_FROM || process.env.EMAIL_USER || '',
+  // NSFW Moderation config
+  NSFW_ENABLED: process.env.NSFW_ENABLED !== 'false', // Default: true, set to 'false' to disable
 };
 
 // eslint-disable-next-line no-console
