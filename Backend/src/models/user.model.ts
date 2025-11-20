@@ -31,6 +31,8 @@ export interface IUser extends Document {
   };
   lastSeenAt?: Date | null;
 
+  isActive: boolean;
+
   // RBAC
   roles: Role[];
 
@@ -73,6 +75,8 @@ const UserSchema = new Schema<IUser>(
       updatedAt: { type: Date, default: null },
     },
     lastSeenAt: { type: Date, default: null, index: true },
+
+    isActive: { type: Boolean, default: true, index: true },
 
     roles: {
       type: [{ type: String, enum: ['user', 'moderator', 'admin', 'superadmin'] }],
