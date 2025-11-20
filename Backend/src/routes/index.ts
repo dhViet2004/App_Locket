@@ -6,7 +6,7 @@ import friendshipRoutes from './friendship.routes';
 import commentRoutes from './comment.routes';
 import chatRoutes from './chat.routes';
 import userRoutes from './user.routes';
-import notificationRoutes from './notification.routes';
+import adminRoutes from './admin.routes';
 
 const router = Router();
 
@@ -18,6 +18,6 @@ router.use('/friendships', friendshipRoutes);
 router.use('/comments', commentRoutes);
 router.use('/chat', chatRoutes);
 router.use('/users', userRoutes);
-router.use('/notifications', notificationRoutes);
+router.use('/admin', adminRoutes);
 
 export default router;
