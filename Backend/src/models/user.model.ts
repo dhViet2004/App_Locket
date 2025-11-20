@@ -10,6 +10,7 @@ export interface IUser extends Document {
   phone?: string;
   passwordHash: string;
   avatarUrl?: string;
+  avatarPublicId?: string;
   bio?: string;
   settings: {
     privacy: 'friends' | 'private';
@@ -55,7 +56,8 @@ const UserSchema = new Schema<IUser>(
     phone: { type: String, trim: true, sparse: true, unique: true },
     passwordHash: { type: String, required: true },
     avatarUrl: { type: String },
-    bio: { type: String, maxlength: 280 },
+    avatarPublicId: { type: String },
+    bio: { type: String, maxlength: 150 },
     settings: {
       privacy: { type: String, enum: ['friends', 'private'], default: 'friends' },
       allowCommentsFrom: { type: String, enum: ['friends', 'no_one'], default: 'friends' },

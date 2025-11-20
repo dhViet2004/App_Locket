@@ -2,6 +2,7 @@ import { Post, IPost } from '../models/post.model';
 import { Friendship } from '../models/friendship.model';
 import { Device } from '../models/device.model';
 import { Types } from 'mongoose';
+import { ApiError } from '../utils/apiResponse';
 
 /**
  * Class PostService - Xử lý business logic cho Post
@@ -86,6 +87,119 @@ export class PostService {
     // TODO: Thực tế sẽ gọi:
     // - Expo Push API: https://docs.expo.dev/push-notifications/sending-notifications/
     // - FCM: https://firebase.google.com/docs/cloud-messaging
+  }
+
+  /**
+   * Lấy lịch sử posts giữa current user và một friend
+   * @param currentUserId - ID của user hiện tại
+   * @param friendId - ID của friend
+   * @param page - Số trang (default: 1)
+   * @param limit - Số lượng posts mỗi trang (default: 20)
+   * @param groupByMonth - Có nhóm theo tháng/năm không (default: false)
+   * @returns Danh sách posts hoặc posts được nhóm theo tháng/năm
+   */
+  async getHistoryWithFriend(
+    currentUserId: string,
+    friendId: string,
+    page: number = 1,
+    limit: number = 20,
+    groupByMonth: boolean = false
+  ): Promise<{
+    posts: IPost[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+    grouped?: Record<string, IPost[]>;
+  }> {
+    // 1. Kiểm tra xem hai user có phải là bạn bè không
+    const friendship = await Friendship.findOne({
+      $or: [
+        { userA: new Types.ObjectId(currentUserId), userB: new Types.ObjectId(friendId) },
+        { userA: new Types.ObjectId(friendId), userB: new Types.ObjectId(currentUserId) },
+      ],
+      status: 'accepted',
+    });
+
+    if (!friendship) {
+      throw new ApiError(403, 'You are not friends with this user');
+    }
+
+    // 2. Tính toán pagination
+    const skip = (page - 1) * limit;
+
+    // 3. Query posts: (author = me OR author = friend) AND visibility = 'friends' AND not deleted
+    const query = {
+      $and: [
+        {
+          $or: [
+            { author: new Types.ObjectId(currentUserId) },
+            { author: new Types.ObjectId(friendId) },
+          ],
+        },
+        { visibility: 'friends' },
+        {
+          $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+        },
+      ],
+    };
+
+    // 4. Lấy tổng số posts
+    const total = await Post.countDocuments(query);
+
+    // 5. Lấy posts với pagination và sort
+    const posts = await Post.find(query)
+      .populate('author', 'username displayName avatarUrl')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // 6. Tính toán pagination info
+    const totalPages = Math.ceil(total / limit);
+
+    const result: {
+      posts: IPost[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+      grouped?: Record<string, IPost[]>;
+    } = {
+      posts: posts as IPost[],
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+
+    // 7. Nếu yêu cầu nhóm theo tháng/năm
+    if (groupByMonth) {
+      const grouped: Record<string, IPost[]> = {};
+
+      posts.forEach((post) => {
+        const date = new Date(post.createdAt);
+        const monthYear = date.toLocaleDateString('en-US', {
+          month: 'long',
+          year: 'numeric',
+        });
+
+        if (!grouped[monthYear]) {
+          grouped[monthYear] = [];
+        }
+        grouped[monthYear].push(post as IPost);
+      });
+
+      result.grouped = grouped;
+    }
+
+    return result;
   }
 }
 
