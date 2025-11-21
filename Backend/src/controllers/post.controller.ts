@@ -173,3 +173,94 @@ export const getHistory = asyncHandler(async (req: AuthRequest, res: Response) =
 
   return res.status(200).json(ok(result, 'History retrieved successfully'));
 });
+
+/**
+ * Lấy thông tin chi tiết một bài viết theo ID
+ * GET /posts/:id
+ */
+export const getById = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const postId = req.params.id;
+
+  if (!postId) {
+    throw new ApiError(400, 'Post ID is required');
+  }
+
+  const post = await postService.getPostById(postId);
+
+  return res.status(200).json(ok(post, 'Post retrieved successfully'));
+});
+
+/**
+ * Cập nhật bài viết (chỉ cho phép sửa caption và location)
+ * PUT /posts/:id
+ * Body: { caption?: string, location?: { name?: string, lat?: number, lng?: number } }
+ */
+export const update = asyncHandler(async (req: AuthRequest, res: Response) => {
+  // Kiểm tra authentication
+  if (!req.user || !req.user._id) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const postId = req.params.id;
+  const userId = req.user._id.toString();
+
+  if (!postId) {
+    throw new ApiError(400, 'Post ID is required');
+  }
+
+  // Lấy dữ liệu cập nhật từ body
+  const { caption, location } = req.body;
+
+  // Validate: chỉ cho phép cập nhật caption và location
+  const updateData: { caption?: string; location?: { name?: string; lat?: number; lng?: number } } = {};
+
+  if (caption !== undefined) {
+    if (typeof caption !== 'string' || caption.length > 300) {
+      throw new ApiError(400, 'Caption must be a string with max 300 characters');
+    }
+    updateData.caption = caption || undefined;
+  }
+
+  if (location !== undefined) {
+    if (typeof location !== 'object' || location === null) {
+      throw new ApiError(400, 'Location must be an object');
+    }
+    updateData.location = {
+      name: location.name,
+      lat: location.lat ? parseFloat(location.lat) : undefined,
+      lng: location.lng ? parseFloat(location.lng) : undefined,
+    };
+  }
+
+  // Kiểm tra có ít nhất một field để update
+  if (Object.keys(updateData).length === 0) {
+    throw new ApiError(400, 'At least one field (caption or location) must be provided');
+  }
+
+  const updatedPost = await postService.updatePost(postId, userId, updateData);
+
+  return res.status(200).json(ok(updatedPost, 'Post updated successfully'));
+});
+
+/**
+ * Xóa bài viết (chỉ chủ bài viết mới được xóa)
+ * DELETE /posts/:id
+ */
+export const remove = asyncHandler(async (req: AuthRequest, res: Response) => {
+  // Kiểm tra authentication
+  if (!req.user || !req.user._id) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const postId = req.params.id;
+  const userId = req.user._id.toString();
+
+  if (!postId) {
+    throw new ApiError(400, 'Post ID is required');
+  }
+
+  // Xóa post (service sẽ kiểm tra quyền và xóa ảnh trên Cloudinary)
+  await postService.deletePost(postId, userId);
+
+  return res.status(200).json(ok({ postId }, 'Post deleted successfully'));
+});

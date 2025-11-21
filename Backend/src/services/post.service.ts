@@ -64,7 +64,7 @@ export class PostService {
       user: { $in: friendIds.map((id) => new Types.ObjectId(id)) },
     });
 
-    const tokens = devices.map((device) => device.pushToken);
+    const tokens = devices.map((device) => device.fcmToken).filter(Boolean);
 
     if (tokens.length === 0) {
       return;
@@ -170,7 +170,7 @@ export class PostService {
       };
       grouped?: Record<string, IPost[]>;
     } = {
-      posts: posts as IPost[],
+      posts: posts as unknown as IPost[],
       pagination: {
         page,
         limit,
@@ -193,13 +193,149 @@ export class PostService {
         if (!grouped[monthYear]) {
           grouped[monthYear] = [];
         }
-        grouped[monthYear].push(post as IPost);
+        grouped[monthYear].push(post as unknown as IPost);
       });
 
       result.grouped = grouped;
     }
 
-    return result;
+    return result as {
+      posts: IPost[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+      grouped?: Record<string, IPost[]>;
+    };
+  }
+
+  /**
+   * Lấy thông tin chi tiết một bài viết theo ID
+   * @param postId - ID của post
+   * @returns Post document với author đã populate
+   */
+  async getPostById(postId: string): Promise<IPost> {
+    const post = await Post.findById(postId)
+      .populate('author', 'username displayName avatarUrl')
+      .lean();
+
+    if (!post) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    // Kiểm tra post đã bị xóa chưa
+    if (post.deletedAt) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    return post as unknown as IPost;
+  }
+
+  /**
+   * Cập nhật bài viết (chỉ cho phép sửa caption và location)
+   * @param postId - ID của post
+   * @param userId - ID của user đang thực hiện update
+   * @param updateData - Dữ liệu cập nhật (caption, location)
+   * @returns Post document đã cập nhật
+   */
+  async updatePost(
+    postId: string,
+    userId: string,
+    updateData: { caption?: string; location?: { name?: string; lat?: number; lng?: number } }
+  ): Promise<IPost> {
+    // 1. Tìm post
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    // 2. Kiểm tra post đã bị xóa chưa
+    if (post.deletedAt) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    // 3. Kiểm tra quyền sở hữu
+    const postAuthorId = post.author.toString();
+    if (postAuthorId !== userId) {
+      throw new ApiError(403, 'You do not have permission to update this post');
+    }
+
+    // 4. Chỉ cho phép cập nhật caption và location
+    if (updateData.caption !== undefined) {
+      post.caption = updateData.caption || undefined;
+    }
+
+    if (updateData.location !== undefined) {
+      post.location = updateData.location;
+    }
+
+    // 5. Lưu và populate author
+    await post.save();
+    await post.populate('author', 'username displayName avatarUrl');
+
+    return post;
+  }
+
+  /**
+   * Xóa bài viết (chỉ chủ bài viết mới được xóa)
+   * @param postId - ID của post
+   * @param userId - ID của user đang thực hiện xóa
+   * @returns Post document đã xóa
+   */
+  async deletePost(postId: string, userId: string): Promise<IPost> {
+    // 1. Tìm post
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    // 2. Kiểm tra post đã bị xóa chưa
+    if (post.deletedAt) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    // 3. Kiểm tra quyền sở hữu
+    const postAuthorId = post.author.toString();
+    if (postAuthorId !== userId) {
+      throw new ApiError(403, 'You do not have permission to delete this post');
+    }
+
+    // 4. Lấy imageUrl để xóa trên Cloudinary
+    const imageUrl = post.imageUrl;
+
+    // 5. Xóa ảnh trên Cloudinary
+    const { deleteFromCloudinary, extractPublicIdFromUrl } = await import('../utils/cloudinary');
+    const publicId = extractPublicIdFromUrl(imageUrl);
+    
+    if (publicId) {
+      try {
+        await deleteFromCloudinary(publicId);
+        console.log(`Deleted image from Cloudinary: ${publicId}`);
+      } catch (error) {
+        console.error('Error deleting image from Cloudinary:', error);
+        // Không throw error để vẫn xóa được post trong DB nếu Cloudinary lỗi
+      }
+    } else {
+      console.warn(`Could not extract public_id from URL: ${imageUrl}`);
+    }
+
+    // 6. Xóa post trong DB (hard delete)
+    await Post.findByIdAndDelete(postId);
+
+    // 7. Xóa các comment và reaction liên quan
+    const { Comment } = await import('../models/comment.model');
+    const { Reaction } = await import('../models/reaction.model');
+    
+    await Promise.all([
+      Comment.deleteMany({ post: post._id }),
+      Reaction.deleteMany({ post: post._id }),
+    ]);
+
+    return post;
   }
 }
 

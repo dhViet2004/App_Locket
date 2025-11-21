@@ -118,5 +118,59 @@ router.get('/:id/comments', commentController.getPostComments);
  */
 router.get('/history/:friendId', requireAuth, postController.getHistory);
 
+/**
+ * GET /posts/:id
+ * Lấy thông tin chi tiết một bài viết theo ID
+ * Populate thông tin người đăng (Author) để hiển thị Avatar/Tên
+ * 
+ * Response: {
+ *   success: true,
+ *   data: {
+ *     _id: string,
+ *     author: { _id, username, displayName, avatarUrl },
+ *     imageUrl: string,
+ *     caption: string,
+ *     location: { name, lat, lng },
+ *     ...
+ *   }
+ * }
+ */
+router.get('/:id', postController.getById);
+
+/**
+ * PUT /posts/:id
+ * Cập nhật bài viết (chỉ cho phép sửa caption hoặc location)
+ * Không cho phép sửa ảnh (muốn đổi ảnh phải xóa đi đăng lại)
+ * 
+ * Body: {
+ *   caption?: string,
+ *   location?: { name?: string, lat?: number, lng?: number }
+ * }
+ * 
+ * Yêu cầu: Người sửa phải là chủ bài viết (req.user.id === post.author.id)
+ * 
+ * Response: {
+ *   success: true,
+ *   data: Post (đã cập nhật)
+ * }
+ */
+router.put('/:id', requireAuth, postController.update);
+
+/**
+ * DELETE /posts/:id
+ * Xóa bài viết
+ * 
+ * Yêu cầu: Người xóa phải là chủ bài viết (req.user.id === post.author.id)
+ * 
+ * Lưu ý: Khi xóa bài trong DB, sẽ gọi API Cloudinary xóa luôn tấm ảnh đó trên đám mây
+ * 
+ * Response: {
+ *   success: true,
+ *   data: { postId: string },
+ *   message: "Post deleted successfully"
+ * }
+ */
+router.delete('/:id', requireAuth, postController.remove);
+
 export default router;
 

@@ -7,10 +7,27 @@ import bcrypt from 'bcryptjs';
 import { sendOTPEmail } from '../utils/email';
 
 export async function register(username: string, password: string, email?: string) {
-	const exists = await User.findOne({ $or: [{ username }, { email }] });
-	if (exists) throw new ApiError(409, 'User already exists');
+	// Kiểm tra username đã tồn tại chưa
+	const existingUser = await User.findOne({ username: username.toLowerCase() });
+	if (existingUser) {
+		throw new ApiError(409, 'Username already exists');
+	}
+
+	// Kiểm tra email đã tồn tại chưa (nếu có email)
+	if (email) {
+		const normalizedEmail = email.toLowerCase().trim();
+		const existingEmail = await User.findOne({ email: normalizedEmail });
+		if (existingEmail) {
+			throw new ApiError(409, 'Email already in use');
+		}
+	}
+
 	const passwordHash = await bcrypt.hash(password, 10);
-	const user = await User.create({ username, email, passwordHash });
+	const user = await User.create({ 
+		username: username.toLowerCase(), 
+		email: email ? email.toLowerCase().trim() : undefined, 
+		passwordHash 
+	});
 	const token = generateToken(user.id);
 	return { user: sanitize(user), token };
 }
@@ -199,6 +216,28 @@ async function mockSendSMS(phone: string, code: string): Promise<void> {
 function generateToken(userId: string) {
 	const options: jwt.SignOptions = { expiresIn: env.JWT_EXPIRES_IN as any };
 	return jwt.sign({ sub: userId }, env.JWT_SECRET as jwt.Secret, options);
+}
+
+/**
+ * Kiểm tra email đã tồn tại chưa
+ * @param email - Email cần kiểm tra
+ * @returns { available: boolean } - true nếu email có thể sử dụng, false nếu đã tồn tại
+ */
+export async function checkEmailAvailability(email: string): Promise<{ available: boolean }> {
+	const normalizedEmail = email.toLowerCase().trim();
+	const existingEmail = await User.findOne({ email: normalizedEmail });
+	return { available: !existingEmail };
+}
+
+/**
+ * Kiểm tra username đã tồn tại chưa
+ * @param username - Username cần kiểm tra
+ * @returns { available: boolean } - true nếu username có thể sử dụng, false nếu đã tồn tại
+ */
+export async function checkUsernameAvailability(username: string): Promise<{ available: boolean }> {
+	const normalizedUsername = username.toLowerCase().trim();
+	const existingUser = await User.findOne({ username: normalizedUsername });
+	return { available: !existingUser };
 }
 
 function sanitize(user: any) {

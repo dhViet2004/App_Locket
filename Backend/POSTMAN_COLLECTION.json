@@ -34,6 +34,11 @@
       "key": "other_user_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "audit_log_id",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -148,6 +153,94 @@
               "host": ["{{base_url}}"],
               "path": ["api", "auth", "verify-otp"]
             }
+          }
+        },
+        {
+          "name": "Check Email Availability",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success field', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('Response has available field', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('available');",
+                  "    pm.expect(jsonData.data.available).to.be.a('boolean');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/check-email/:email",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "check-email", ":email"],
+              "variable": [
+                {
+                  "key": "email",
+                  "value": "testuser@example.com",
+                  "description": "Email cần kiểm tra"
+                }
+              ]
+            },
+            "description": "Kiểm tra email đã tồn tại trong hệ thống chưa.\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Email is available\" hoặc \"Email already in use\",\n  \"data\": {\n    \"available\": true hoặc false\n  }\n}\n```\n\n**Lưu ý:**\n- `available: true` - Email có thể sử dụng (chưa tồn tại)\n- `available: false` - Email đã tồn tại\n- Email sẽ được normalize (lowercase, trim) trước khi kiểm tra"
+          }
+        },
+        {
+          "name": "Check Username Availability",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success field', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('Response has available field', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('available');",
+                  "    pm.expect(jsonData.data.available).to.be.a('boolean');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/check-username/:username",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "check-username", ":username"],
+              "variable": [
+                {
+                  "key": "username",
+                  "value": "testuser",
+                  "description": "Username cần kiểm tra"
+                }
+              ]
+            },
+            "description": "Kiểm tra username đã tồn tại trong hệ thống chưa.\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Username is available\" hoặc \"Username already exists\",\n  \"data\": {\n    \"available\": true hoặc false\n  }\n}\n```\n\n**Lưu ý:**\n- `available: true` - Username có thể sử dụng (chưa tồn tại)\n- `available: false` - Username đã tồn tại\n- Username sẽ được normalize (lowercase, trim) trước khi kiểm tra\n- Username phải có ít nhất 3 ký tự"
           }
         }
       ]
@@ -312,6 +405,141 @@
               "path": ["api", "posts", "suggest-caption"]
             },
             "description": "Gợi ý caption cho ảnh sử dụng Groq AI.\n\n**Cách 2: Gửi Base64 (JSON)**\n- Gửi ảnh dưới dạng base64 string\n- Format: `data:image/jpeg;base64,<base64_string>` hoặc chỉ `<base64_string>`\n- Backend sẽ tự động parse và xử lý\n\n**Request Body:**\n```json\n{\n  \"base64Image\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}\n```\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Caption suggested successfully\",\n  \"data\": {\n    \"caption\": \"Một buổi sáng đẹp trời...\"\n  }\n}\n```\n\n**Lưu ý:**\n- Cần có GROQ_API_KEY trong .env để hoạt động\n- Ảnh sẽ được tự động nén xuống max 1024px trước khi gửi lên Groq\n- Caption được generate bằng tiếng Việt, phù hợp với mạng xã hội"
+          }
+        },
+        {
+          "name": "Get Post by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success field', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('Post has author populated', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data) {",
+                  "        pm.expect(jsonData.data).to.have.property('author');",
+                  "        pm.expect(jsonData.data.author).to.have.property('username');",
+                  "        pm.expect(jsonData.data.author).to.have.property('displayName');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/posts/{{post_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "posts", "{{post_id}}"]
+            },
+            "description": "Lấy thông tin chi tiết một bài viết dựa vào ID.\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Post retrieved successfully\",\n  \"data\": {\n    \"_id\": \"...\",\n    \"author\": {\n      \"_id\": \"...\",\n      \"username\": \"user123\",\n      \"displayName\": \"User Name\",\n      \"avatarUrl\": \"https://...\"\n    },\n    \"imageUrl\": \"https://...\",\n    \"caption\": \"Sáng nay nắng đẹp!\",\n    \"location\": {\n      \"name\": \"Hanoi\",\n      \"lat\": 21.03,\n      \"lng\": 105.85\n    },\n    \"visibility\": \"friends\",\n    \"reactionCount\": 10,\n    \"commentCount\": 5,\n    \"createdAt\": \"2024-01-01T00:00:00.000Z\",\n    \"updatedAt\": \"2024-01-01T00:00:00.000Z\"\n  }\n}\n```\n\n**Lưu ý:**\n- Author được populate với thông tin username, displayName, avatarUrl\n- Không cần authentication để xem post"
+          }
+        },
+        {
+          "name": "Update Post",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success field', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('Post updated successfully', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('_id');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"caption\": \"Caption đã được cập nhật!\",\n  \"location\": {\n    \"name\": \"Ho Chi Minh City\",\n    \"lat\": 10.762622,\n    \"lng\": 106.660172\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/posts/{{post_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "posts", "{{post_id}}"]
+            },
+            "description": "Cập nhật bài viết. Chỉ cho phép sửa `caption` hoặc `location`. Không cho phép sửa ảnh (muốn đổi ảnh phải xóa đi đăng lại).\n\n**Yêu cầu:**\n- Header: `Authorization: Bearer <token>` (token của chủ bài viết)\n- Người sửa phải là chủ bài viết (`req.user.id === post.author.id`)\n\n**Request Body:**\n```json\n{\n  \"caption\": \"Caption mới (optional)\",\n  \"location\": {\n    \"name\": \"Tên địa điểm (optional)\",\n    \"lat\": 10.762622,\n    \"lng\": 106.660172\n  }\n}\n```\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Post updated successfully\",\n  \"data\": {\n    \"_id\": \"...\",\n    \"author\": {...},\n    \"caption\": \"Caption đã được cập nhật!\",\n    \"location\": {...},\n    ...\n  }\n}\n```\n\n**Lưu ý:**\n- Có thể chỉ cập nhật caption hoặc chỉ location, hoặc cả hai\n- Nếu không phải chủ bài viết, sẽ nhận lỗi 403"
+          }
+        },
+        {
+          "name": "Delete Post",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success field', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('Post deleted successfully', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('postId');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/posts/{{post_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "posts", "{{post_id}}"]
+            },
+            "description": "Xóa bài viết. Chỉ chủ bài viết mới được xóa.\n\n**Yêu cầu:**\n- Header: `Authorization: Bearer <token>` (token của chủ bài viết)\n- Người xóa phải là chủ bài viết (`req.user.id === post.author.id`)\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Post deleted successfully\",\n  \"data\": {\n    \"postId\": \"...\"\n  }\n}\n```\n\n**Lưu ý:**\n- Khi xóa bài trong DB, sẽ gọi API Cloudinary xóa luôn tấm ảnh đó trên đám mây để dọn rác\n- Tất cả comment và reaction liên quan cũng sẽ bị xóa\n- Nếu không phải chủ bài viết, sẽ nhận lỗi 403"
           }
         }
       ]
@@ -721,7 +949,8 @@
               "variable": [
                 {
                   "key": "userId",
-                  "value": "652000000000000000000002"
+                  "value": "{{user_id}}",
+                  "description": "ID của user cần ban"
                 }
               ]
             },
@@ -774,7 +1003,8 @@
               "variable": [
                 {
                   "key": "userId",
-                  "value": "652000000000000000000002"
+                  "value": "{{user_id}}",
+                  "description": "ID của user cần unban"
                 }
               ]
             },
@@ -861,6 +1091,11 @@
                   "        pm.expect(log).to.have.property('targetId');",
                   "        pm.expect(log).to.have.property('details');",
                   "        pm.expect(log).to.have.property('createdAt');",
+                  "        ",
+                  "        // Auto-save first audit log ID for testing",
+                  "        if (log._id) {",
+                  "            pm.collectionVariables.set('audit_log_id', log._id);",
+                  "        }",
                   "    }",
                   "});"
                 ]
@@ -956,7 +1191,8 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": "65a000000000000000000001"
+                  "value": "{{audit_log_id}}",
+                  "description": "ID của audit log (có thể lấy từ Get Audit Logs response)"
                 }
               ]
             },
@@ -998,7 +1234,8 @@
               "variable": [
                 {
                   "key": "userId",
-                  "value": "652000000000000000000002"
+                  "value": "{{user_id}}",
+                  "description": "ID của user để test"
                 }
               ]
             },

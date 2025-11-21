@@ -1,0 +1,107 @@
+{
+  "info": {
+    "name": "Friendship API",
+    "description": "Friendship endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "post_id",
+      "value": "656000000000000000000001",
+      "type": "string"
+    },
+    {
+      "key": "conversation_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "other_user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "audit_log_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Send Friend Request",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"toUserId\": \"652000000000000000000002\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/friendships/request",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "friendships",
+            "request"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Accept Friend Request",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/friendships/:requestId/accept",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "friendships",
+            ":requestId",
+            "accept"
+          ],
+          "variable": [
+            {
+              "key": "requestId",
+              "value": "659000000000000000000001"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

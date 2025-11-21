@@ -64,5 +64,28 @@ export async function deleteFromCloudinary(publicId: string): Promise<void> {
   }
 }
 
+/**
+ * Extract public_id từ Cloudinary URL
+ * Format: https://res.cloudinary.com/{cloud_name}/image/upload/{version}/{public_id}.{format}
+ * hoặc: https://res.cloudinary.com/{cloud_name}/image/upload/{public_id}.{format}
+ */
+export function extractPublicIdFromUrl(url: string): string | null {
+  try {
+    // Pattern để match Cloudinary URL
+    const pattern = /\/image\/upload\/(?:v\d+\/)?(.+?)(?:\.[^.]+)?$/;
+    const match = url.match(pattern);
+    
+    if (match && match[1]) {
+      // Remove extension nếu có
+      return match[1].replace(/\.[^.]+$/, '');
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error extracting public_id from URL:', error);
+    return null;
+  }
+}
+
 export { cloudinary };
 
