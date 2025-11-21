@@ -13,6 +13,10 @@ export interface IPost extends Document {
   reactionCount: number;
   commentCount: number;
   reactionCounts: Record<string, number>;
+  viewers: Array<{
+    userId: Types.ObjectId;
+    seenAt: Date;
+  }>;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
@@ -32,6 +36,12 @@ const PostSchema = new Schema<IPost>(
     reactionCount: { type: Number, default: 0 },
     commentCount: { type: Number, default: 0 },
     reactionCounts: { type: Map, of: Number, default: {} },
+    viewers: [
+      {
+        userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+        seenAt: { type: Date, required: true, default: Date.now },
+      },
+    ],
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true }

@@ -4,7 +4,7 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { connectDB } from './config/db';
 import { recapJob } from './jobs/recap.job';
-import { initializeSocketIO } from './services/socket.service';
+import { initializeSocketIO, setSocketIOInstance } from './services/socket.service';
 import { loadNSFWModel } from './services/moderation.service';
 
 async function bootstrap() {
@@ -54,6 +54,8 @@ async function bootstrap() {
 
   // Khởi tạo Socket.io handlers
   initializeSocketIO(io);
+  // Set io instance để có thể sử dụng từ service/controller
+  setSocketIOInstance(io);
   console.log('[Server] Socket.io initialized');
 
   // Khởi động Recap Video Background Job

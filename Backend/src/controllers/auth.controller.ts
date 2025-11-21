@@ -1,13 +1,22 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import * as AuthService from '../services/auth.service';
-import { ok } from '../utils/apiResponse';
+import { ok, ApiError } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
 
-export const register = asyncHandler(async (req: Request, res: Response) => {
-	const { username, password, email } = req.body as { username: string; password: string; email?: string };
-	const result = await AuthService.register(username, password, email);
-	return res.status(201).json(ok(result, 'registered'));
-});
+export const register = async (req: Request, res: Response, next: NextFunction) => {
+	try {
+		const { username, password, email } = req.body as { username: string; password: string; email?: string };
+		const result = await AuthService.register(username, password, email);
+		return res.status(201).json(ok(result, 'registered'));
+	} catch (error) {
+		// Xử lý lỗi email trùng với message tiếng Việt
+		if (error instanceof ApiError && error.message === 'Email already in use') {
+			return res.status(409).json({ success: false, message: 'Email này đã được sử dụng.' });
+		}
+		// Pass các lỗi khác cho error middleware
+		return next(error);
+	}
+};
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
 	const { identifier, password } = req.body as { identifier: string; password: string };
@@ -45,6 +54,47 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
 
 	const result = await AuthService.verifyOTP(identifier, code);
 	return res.status(200).json(ok(result, 'OTP verified successfully'));
+});
+
+/**
+ * Kiểm tra email đã tồn tại chưa
+ * GET /api/auth/check-email/:email
+ */
+export const checkEmail = asyncHandler(async (req: Request, res: Response) => {
+	const email = req.params.email;
+
+	if (!email) {
+		return res.status(400).json({ success: false, message: 'Email is required' });
+	}
+
+	// Validate email format
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	if (!emailRegex.test(email)) {
+		return res.status(400).json({ success: false, message: 'Invalid email format' });
+	}
+
+	const result = await AuthService.checkEmailAvailability(email);
+	return res.status(200).json(ok(result, result.available ? 'Email is available' : 'Email already in use'));
+});
+
+/**
+ * Kiểm tra username đã tồn tại chưa
+ * GET /api/auth/check-username/:username
+ */
+export const checkUsername = asyncHandler(async (req: Request, res: Response) => {
+	const username = req.params.username;
+
+	if (!username) {
+		return res.status(400).json({ success: false, message: 'Username is required' });
+	}
+
+	// Validate username length
+	if (username.length < 3) {
+		return res.status(400).json({ success: false, message: 'Username must be at least 3 characters' });
+	}
+
+	const result = await AuthService.checkUsernameAvailability(username);
+	return res.status(200).json(ok(result, result.available ? 'Username is available' : 'Username already exists'));
 });
 
 /**

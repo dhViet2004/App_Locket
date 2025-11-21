@@ -7,6 +7,7 @@ import commentRoutes from './comment.routes';
 import chatRoutes from './chat.routes';
 import userRoutes from './user.routes';
 import adminRoutes from './admin.routes';
+import inviteApiRoutes from './invite-api.routes';
 
 const router = Router();
 
@@ -19,5 +20,6 @@ router.use('/comments', commentRoutes);
 router.use('/chat', chatRoutes);
 router.use('/users', userRoutes);
 router.use('/admin', adminRoutes);
+router.use('/invites', inviteApiRoutes);
 
 export default router;

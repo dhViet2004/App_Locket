@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import routes from './routes';
+import inviteRoutes from './routes/invite.routes';
 import { errorHandler } from './middlewares/error.middleware';
 
 export function createApp() {
@@ -12,6 +13,10 @@ export function createApp() {
   app.use(express.json());
   app.use(morgan('dev'));
 
+  // Invite route (không nằm trong /api)
+  app.use('/invite', inviteRoutes);
+
+  // API routes
   app.use('/api', routes);
 
   app.use((req, res) => res.status(404).json({ success: false, message: 'Not Found' }));

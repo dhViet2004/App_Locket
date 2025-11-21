@@ -54,9 +54,9 @@ const UserSchema = new Schema<IUser>(
   {
     username: { type: String, required: true, trim: true, lowercase: true, unique: true, index: true },
     displayName: { type: String, trim: true },
-    email: { type: String, trim: true, lowercase: true, sparse: true, unique: true },
+    email: { type: String, trim: true, lowercase: true, sparse: true, unique: true, index: true },
     phone: { type: String, trim: true, sparse: true, unique: true },
-    passwordHash: { type: String, required: true },
+    passwordHash: { type: String, required: true, select: false },
     avatarUrl: { type: String },
     avatarPublicId: { type: String },
     bio: { type: String, maxlength: 150 },

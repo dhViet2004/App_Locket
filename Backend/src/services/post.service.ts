@@ -3,6 +3,7 @@ import { Friendship } from '../models/friendship.model';
 import { Device } from '../models/device.model';
 import { Types } from 'mongoose';
 import { ApiError } from '../utils/apiResponse';
+import { getSocketIOInstance } from './socket.service';
 
 /**
  * Class PostService - Xử lý business logic cho Post
@@ -64,7 +65,7 @@ export class PostService {
       user: { $in: friendIds.map((id) => new Types.ObjectId(id)) },
     });
 
-    const tokens = devices.map((device) => device.pushToken);
+    const tokens = devices.map((device) => device.fcmToken).filter(Boolean);
 
     if (tokens.length === 0) {
       return;
@@ -170,7 +171,7 @@ export class PostService {
       };
       grouped?: Record<string, IPost[]>;
     } = {
-      posts: posts as IPost[],
+      posts: posts as unknown as IPost[],
       pagination: {
         page,
         limit,
@@ -193,13 +194,310 @@ export class PostService {
         if (!grouped[monthYear]) {
           grouped[monthYear] = [];
         }
-        grouped[monthYear].push(post as IPost);
+        grouped[monthYear].push(post as unknown as IPost);
       });
 
       result.grouped = grouped;
     }
 
-    return result;
+    return result as {
+      posts: IPost[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+      grouped?: Record<string, IPost[]>;
+    };
+  }
+
+  /**
+   * Lấy thông tin chi tiết một bài viết theo ID
+   * @param postId - ID của post
+   * @returns Post document với author đã populate
+   */
+  async getPostById(postId: string): Promise<IPost> {
+    const post = await Post.findById(postId)
+      .populate('author', 'username displayName avatarUrl')
+      .lean();
+
+    if (!post) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    // Kiểm tra post đã bị xóa chưa
+    if (post.deletedAt) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    return post as unknown as IPost;
+  }
+
+  /**
+   * Cập nhật bài viết (chỉ cho phép sửa caption và location)
+   * @param postId - ID của post
+   * @param userId - ID của user đang thực hiện update
+   * @param updateData - Dữ liệu cập nhật (caption, location)
+   * @returns Post document đã cập nhật
+   */
+  async updatePost(
+    postId: string,
+    userId: string,
+    updateData: { caption?: string; location?: { name?: string; lat?: number; lng?: number } }
+  ): Promise<IPost> {
+    // 1. Tìm post
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    // 2. Kiểm tra post đã bị xóa chưa
+    if (post.deletedAt) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    // 3. Kiểm tra quyền sở hữu
+    const postAuthorId = post.author.toString();
+    if (postAuthorId !== userId) {
+      throw new ApiError(403, 'You do not have permission to update this post');
+    }
+
+    // 4. Chỉ cho phép cập nhật caption và location
+    if (updateData.caption !== undefined) {
+      post.caption = updateData.caption || undefined;
+    }
+
+    if (updateData.location !== undefined) {
+      post.location = updateData.location;
+    }
+
+    // 5. Lưu và populate author
+    await post.save();
+    await post.populate('author', 'username displayName avatarUrl');
+
+    return post;
+  }
+
+  /**
+   * Xóa bài viết (chỉ chủ bài viết mới được xóa)
+   * @param postId - ID của post
+   * @param userId - ID của user đang thực hiện xóa
+   * @returns Post document đã xóa
+   */
+  async deletePost(postId: string, userId: string): Promise<IPost> {
+    // 1. Tìm post
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    // 2. Kiểm tra post đã bị xóa chưa
+    if (post.deletedAt) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    // 3. Kiểm tra quyền sở hữu
+    const postAuthorId = post.author.toString();
+    if (postAuthorId !== userId) {
+      throw new ApiError(403, 'You do not have permission to delete this post');
+    }
+
+    // 4. Lấy imageUrl để xóa trên Cloudinary
+    const imageUrl = post.imageUrl;
+
+    // 5. Xóa ảnh trên Cloudinary
+    const { deleteFromCloudinary, extractPublicIdFromUrl } = await import('../utils/cloudinary');
+    const publicId = extractPublicIdFromUrl(imageUrl);
+    
+    if (publicId) {
+      try {
+        await deleteFromCloudinary(publicId);
+        console.log(`Deleted image from Cloudinary: ${publicId}`);
+      } catch (error) {
+        console.error('Error deleting image from Cloudinary:', error);
+        // Không throw error để vẫn xóa được post trong DB nếu Cloudinary lỗi
+      }
+    } else {
+      console.warn(`Could not extract public_id from URL: ${imageUrl}`);
+    }
+
+    // 6. Xóa post trong DB (hard delete)
+    await Post.findByIdAndDelete(postId);
+
+    // 7. Xóa các comment và reaction liên quan
+    const { Comment } = await import('../models/comment.model');
+    const { Reaction } = await import('../models/reaction.model');
+    
+    await Promise.all([
+      Comment.deleteMany({ post: post._id }),
+      Reaction.deleteMany({ post: post._id }),
+    ]);
+
+    return post;
+  }
+
+  /**
+   * Đánh dấu bài viết đã được xem (Mark as Seen)
+   * @param postId - ID của post
+   * @param userId - ID của user đang xem
+   * @returns Post document đã cập nhật
+   */
+  async markPostAsSeen(postId: string, userId: string): Promise<IPost> {
+    // 1. Tìm post
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    // 2. Kiểm tra post đã bị xóa chưa
+    if (post.deletedAt) {
+      throw new ApiError(404, 'Post not found');
+    }
+
+    // 3. Không cho phép tác giả tự đánh dấu đã xem bài viết của mình
+    const postAuthorId = post.author.toString();
+    if (postAuthorId === userId) {
+      throw new ApiError(400, 'You cannot mark your own post as seen');
+    }
+
+    // 4. Kiểm tra xem user đã xem post này chưa
+    const userIdObj = new Types.ObjectId(userId);
+    const existingViewerIndex = post.viewers.findIndex(
+      (viewer) => viewer.userId.toString() === userId
+    );
+
+    const seenAt = new Date();
+
+    if (existingViewerIndex >= 0) {
+      // Nếu đã xem rồi, cập nhật seenAt
+      post.viewers[existingViewerIndex].seenAt = seenAt;
+    } else {
+      // Nếu chưa xem, thêm vào mảng viewers
+      post.viewers.push({
+        userId: userIdObj,
+        seenAt,
+      });
+    }
+
+    // 5. Lưu post
+    await post.save();
+
+    // 6. Emit socket event cho tác giả bài viết
+    const io = getSocketIOInstance();
+    if (io) {
+      const postIdStr = typeof post._id === 'string' ? post._id : (post._id as Types.ObjectId).toString();
+      io.to(`user:${postAuthorId}`).emit('post_seen', {
+        postId: postIdStr,
+        viewedBy: userId,
+        seenAt: seenAt.toISOString(),
+      });
+      console.log(`[Post Service] Emitted post_seen event to user:${postAuthorId} for post:${postIdStr}`);
+    } else {
+      console.warn('[Post Service] Socket.io instance not available, cannot emit post_seen event');
+    }
+
+    return post;
+  }
+
+  /**
+   * Kiểm tra quyền xem tường nhà của một user
+   * @param currentUserId - ID của user đang xem
+   * @param targetUserId - ID của user chủ tường nhà
+   * @returns true nếu có quyền xem, false nếu không
+   */
+  async canViewUserWall(currentUserId: string, targetUserId: string): Promise<boolean> {
+    // Case 1: User tự xem tường nhà của mình
+    if (currentUserId === targetUserId) {
+      return true;
+    }
+
+    // Case 2: Kiểm tra xem hai người có phải là bạn bè không
+    const friendship = await Friendship.findOne({
+      $or: [
+        { userA: new Types.ObjectId(currentUserId), userB: new Types.ObjectId(targetUserId) },
+        { userA: new Types.ObjectId(targetUserId), userB: new Types.ObjectId(currentUserId) },
+      ],
+      status: 'accepted', // Chỉ chấp nhận bạn bè đã accepted
+    });
+
+    return !!friendship;
+  }
+
+  /**
+   * Lấy danh sách bài viết của một user (User Profile Feed / Wall) với Cursor Pagination
+   * @param currentUserId - ID của user đang xem
+   * @param targetUserId - ID của user chủ tường nhà
+   * @param limit - Số lượng posts mỗi lần (default: 10)
+   * @param cursor - Mốc thời gian (createdAt) của bài viết cuối cùng (optional)
+   * @returns Danh sách posts với pagination info
+   */
+  async getUserWall(
+    currentUserId: string,
+    targetUserId: string,
+    limit: number = 10,
+    cursor?: string
+  ): Promise<{
+    data: IPost[];
+    pagination: {
+      nextCursor: string | null;
+      hasMore: boolean;
+    };
+  }> {
+    // 1. Kiểm tra quyền xem tường nhà
+    const canView = await this.canViewUserWall(currentUserId, targetUserId);
+    if (!canView) {
+      throw new ApiError(403, 'You do not have permission to view this user\'s posts');
+    }
+
+    // 2. Xây dựng query
+    const query: any = {
+      author: new Types.ObjectId(targetUserId),
+      deletedAt: null, // Chỉ lấy posts chưa bị xóa
+    };
+
+    // 3. Nếu có cursor, thêm điều kiện lọc bài viết cũ hơn cursor
+    if (cursor) {
+      try {
+        const cursorDate = new Date(cursor);
+        query.createdAt = { $lt: cursorDate };
+      } catch (error) {
+        // Nếu cursor không hợp lệ, bỏ qua
+        console.warn('Invalid cursor format:', cursor);
+      }
+    }
+
+    // 4. Lấy posts với cursor pagination (lấy thêm 1 để kiểm tra hasMore)
+    const posts = await Post.find(query)
+      .select('_id author imageUrl caption location visibility reactionCount commentCount reactionCounts viewers createdAt updatedAt')
+      .populate('author', 'username displayName avatarUrl') // Populate thông tin tác giả
+      .sort({ createdAt: -1 }) // Sắp xếp giảm dần (mới nhất lên đầu)
+      .limit(limit + 1) // Lấy thêm 1 để kiểm tra hasMore
+      .lean();
+
+    // 5. Kiểm tra hasMore
+    const hasMore = posts.length > limit;
+    const postsToReturn = hasMore ? posts.slice(0, limit) : posts;
+
+    // 6. Tính nextCursor
+    let nextCursor: string | null = null;
+    if (hasMore && postsToReturn.length > 0) {
+      const lastPost = postsToReturn[postsToReturn.length - 1];
+      if (lastPost.createdAt) {
+        nextCursor = new Date(lastPost.createdAt).toISOString();
+      }
+    }
+
+    return {
+      data: postsToReturn as unknown as IPost[],
+      pagination: {
+        nextCursor,
+        hasMore,
+      },
+    };
   }
 }
 

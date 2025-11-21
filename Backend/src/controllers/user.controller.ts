@@ -4,7 +4,7 @@ import { buildCrud } from '../utils/crudFactory';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { asyncHandler } from '../utils/asyncHandler';
 import { ApiError, ok } from '../utils/apiResponse';
-import { uploadToCloudinary, deleteFromCloudinary } from '../utils/cloudinary';
+import { userService } from '../services/user.service';
 
 // Định nghĩa type cho Multer file
 interface MulterFile {
@@ -16,93 +16,156 @@ interface MulterFile {
   buffer: Buffer;
 }
 
-// Extend AuthRequest để có file type
-interface ProfileRequest extends Omit<AuthRequest, 'file'> {
+// Extend AuthRequest để có file type cho avatar upload
+interface AvatarRequest extends Omit<AuthRequest, 'file'> {
   file?: MulterFile;
-  body: {
-    displayName?: string;
-    bio?: string;
-  };
 }
 
 /**
- * Cập nhật profile của user
- * POST /api/users/profile
- * Body: multipart/form-data
- *   - avatar: File (optional) - Avatar image
- *   - displayName: string (optional)
- *   - bio: string (optional, max 150 chars)
+ * Đổi mật khẩu
+ * POST /api/users/change-password
+ * Body: { currentPassword: string, newPassword: string }
  */
-export const updateProfile = asyncHandler(async (req: ProfileRequest, res: Response) => {
-  if (!req.user || !req.userId) {
+export const changePassword = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.userId) {
     throw new ApiError(401, 'Unauthorized');
   }
 
-  const userId = req.userId;
-  const { displayName, bio } = req.body;
-  const avatarFile = req.file;
+  const { currentPassword, newPassword } = req.body;
 
-  // Validate bio length
-  if (bio && bio.length > 150) {
-    throw new ApiError(400, 'Bio must be 150 characters or less');
+  if (!currentPassword || !newPassword) {
+    throw new ApiError(400, 'currentPassword and newPassword are required');
   }
 
-  // Tìm user hiện tại
-  const user = await User.findById(userId);
-  if (!user) {
-    throw new ApiError(404, 'User not found');
+  if (newPassword.length < 6) {
+    throw new ApiError(400, 'New password must be at least 6 characters');
   }
 
-  // Cập nhật các trường text
+  const user = await userService.changePassword(req.userId, currentPassword, newPassword);
+
+  // Trả về user đã cập nhật (loại bỏ passwordHash)
+  const userObj = user.toObject();
+  delete (userObj as any).passwordHash;
+
+  return res.status(200).json(ok(userObj, 'Password changed successfully'));
+});
+
+/**
+ * Đổi email
+ * POST /api/users/change-email
+ * Body: { password: string, newEmail: string }
+ */
+export const changeEmail = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.userId) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const { password, newEmail } = req.body;
+
+  if (!password || !newEmail) {
+    throw new ApiError(400, 'password and newEmail are required');
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(newEmail)) {
+    throw new ApiError(400, 'Invalid email format');
+  }
+
+  const user = await userService.changeEmail(req.userId, password, newEmail);
+
+  // Trả về user đã cập nhật (loại bỏ passwordHash)
+  const userObj = user.toObject();
+  delete (userObj as any).passwordHash;
+
+  return res.status(200).json(ok(userObj, 'Email changed successfully'));
+});
+
+/**
+ * Cập nhật thông tin cơ bản (displayName, phone)
+ * PUT /api/users/profile
+ * Body: { displayName?: string, phone?: string }
+ */
+export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.userId) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const { displayName, phone } = req.body;
+
+  const updateData: { displayName?: string; phone?: string } = {};
+
   if (displayName !== undefined) {
-    user.displayName = displayName.trim() || undefined;
-  }
-  if (bio !== undefined) {
-    user.bio = bio.trim() || undefined;
+    updateData.displayName = displayName;
   }
 
-  // Xử lý avatar upload nếu có
-  if (avatarFile) {
-    try {
-      // Xóa avatar cũ nếu có
-      if (user.avatarPublicId) {
-        try {
-          await deleteFromCloudinary(user.avatarPublicId);
-        } catch (error) {
-          console.error('[User] Error deleting old avatar:', error);
-          // Không throw error, tiếp tục upload avatar mới
-        }
-      }
-
-      // Upload avatar mới lên Cloudinary
-      const uploadResult = await uploadToCloudinary(
-        avatarFile.buffer,
-        'locket/avatars',
-        {
-          width: 400,
-          height: 400,
-          crop: 'fill',
-          quality: 'auto',
-          fetch_format: 'auto',
-        }
-      );
-
-      user.avatarUrl = uploadResult.secure_url;
-      user.avatarPublicId = uploadResult.public_id;
-    } catch (error) {
-      console.error('[User] Error uploading avatar:', error);
-      throw new ApiError(500, 'Failed to upload avatar');
-    }
+  if (phone !== undefined) {
+    updateData.phone = phone;
   }
 
-  // Lưu user đã cập nhật
-  await user.save();
+  // Kiểm tra có ít nhất một field để update
+  if (Object.keys(updateData).length === 0) {
+    throw new ApiError(400, 'At least one field (displayName or phone) must be provided');
+  }
+
+  const user = await userService.updateBasicInfo(req.userId, updateData);
 
   // Trả về user đã cập nhật (loại bỏ passwordHash)
   const userObj = user.toObject();
   delete (userObj as any).passwordHash;
 
   return res.status(200).json(ok(userObj, 'Profile updated successfully'));
+});
+
+/**
+ * Đổi avatar
+ * PATCH /api/users/avatar
+ * Body: multipart/form-data với file (avatar)
+ */
+export const updateAvatar = asyncHandler(async (req: AvatarRequest, res: Response) => {
+  if (!req.userId) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const avatarFile = req.file;
+
+  if (!avatarFile || !avatarFile.buffer) {
+    throw new ApiError(400, 'Avatar image is required');
+  }
+
+  const user = await userService.updateAvatar(req.userId, avatarFile.buffer);
+
+  // Trả về user đã cập nhật (loại bỏ passwordHash)
+  const userObj = user.toObject();
+  delete (userObj as any).passwordHash;
+
+  return res.status(200).json(ok(userObj, 'Avatar updated successfully'));
+});
+
+/**
+ * Tìm kiếm người dùng
+ * GET /api/users/search?keyword=abc
+ * Query params: keyword (required)
+ */
+export const searchUsers = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.userId) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const keyword = req.query.keyword as string;
+
+  if (!keyword || keyword.trim().length === 0) {
+    return res.status(200).json(ok([], 'Search results'));
+  }
+
+  // Validate keyword length (tối thiểu 1 ký tự)
+  if (keyword.trim().length < 1) {
+    throw new ApiError(400, 'Keyword must be at least 1 character');
+  }
+
+  const users = await userService.searchUsers(keyword, req.userId);
+
+  return res.status(200).json(ok(users, 'Search results'));
 });
 
 export const { list, getById, create, updateById, removeById } = buildCrud(User);
