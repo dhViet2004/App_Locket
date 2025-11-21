@@ -1,20 +1,76 @@
-import { Text, View, StyleSheet, TouchableOpacity, TextInput } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLoginForm } from "../../src/context/LoginContext";
+import { useAuth } from "../../src/context/AuthContext";
 
 export default function LoginPasswordScreen() {
+  const { identifier, reset: resetLoginForm } = useLoginForm();
+  const { user, login, loading, clearError, error } = useAuth();
   const [password, setPassword] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const handleLogin = () => {
-    if (password.trim()) {
-      // Navigate to main app
+  useEffect(() => {
+    if (!identifier.trim()) {
+      router.replace("/login");
+    }
+  }, [identifier]);
+
+  useEffect(() => {
+    if (error) {
+      setFormError(error);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (user) {
       router.replace("/home");
     }
+  }, [user]);
+
+  const handleLogin = () => {
+    const trimmedIdentifier = identifier.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedIdentifier) {
+      setFormError("Vui lòng nhập email hoặc tên đăng nhập");
+      router.replace("/login");
+      return;
+    }
+
+    if (!trimmedPassword) {
+      setFormError("Vui lòng nhập mật khẩu");
+      return;
+    }
+
+    login(trimmedIdentifier, trimmedPassword)
+      .then(() => {
+        resetLoginForm();
+        setPassword("");
+        setFormError(null);
+        router.replace("/home");
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : "Đăng nhập thất bại. Vui lòng thử lại.";
+        setFormError(message);
+        Alert.alert("Đăng nhập thất bại", message);
+      });
   };
 
-  const isFormValid = password.trim();
+  const handlePasswordChange = (value: string) => {
+    if (formError) {
+      setFormError(null);
+    }
+    if (error) {
+      clearError();
+    }
+
+    setPassword(value);
+  };
+
+  const isFormValid = password.trim().length > 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -31,8 +87,11 @@ export default function LoginPasswordScreen() {
       </View>
 
       {/* Main Content */}
-      <View style={styles.content}>
+        <View style={styles.content}>
         <Text style={styles.title}>Nhập mật khẩu</Text>
+        {identifier ? (
+          <Text style={styles.subtitle}>Tài khoản: {identifier}</Text>
+        ) : null}
         
         <View style={styles.inputContainer}>
           <TextInput
@@ -40,13 +99,15 @@ export default function LoginPasswordScreen() {
             placeholder="Mật khẩu"
             placeholderTextColor="#999999"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={handlePasswordChange}
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
             autoFocus
           />
         </View>
+
+        {!!formError && <Text style={styles.errorText}>{formError}</Text>}
 
         <TouchableOpacity 
           style={styles.forgotPassword}
@@ -59,11 +120,19 @@ export default function LoginPasswordScreen() {
       {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity 
-          style={[styles.loginButton, isFormValid ? styles.loginButtonActive : styles.loginButtonInactive]}
+          style={[
+            styles.loginButton,
+            isFormValid ? styles.loginButtonActive : styles.loginButtonInactive,
+            loading && styles.loginButtonDisabled,
+          ]}
           onPress={handleLogin}
-          disabled={!isFormValid}
+          disabled={!isFormValid || loading}
         >
-          <Text style={styles.loginButtonText}>Đăng nhập</Text>
+          {loading ? (
+            <ActivityIndicator color="#000000" />
+          ) : (
+            <Text style={styles.loginButtonText}>Đăng nhập</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -108,6 +177,12 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     textAlign: 'center',
   },
+  subtitle: {
+    fontSize: 14,
+    color: '#CCCCCC',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
   inputContainer: {
     marginBottom: 20,
   },
@@ -129,6 +204,12 @@ const styles = StyleSheet.create({
     color: '#FFD700',
     fontSize: 14,
   },
+  errorText: {
+    color: '#FF4D4F',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
   footer: {
     paddingHorizontal: 20,
     paddingBottom: 40,
@@ -144,6 +225,9 @@ const styles = StyleSheet.create({
   },
   loginButtonInactive: {
     backgroundColor: '#333333',
+  },
+  loginButtonDisabled: {
+    opacity: 0.7,
   },
   loginButtonText: {
     color: '#000000',

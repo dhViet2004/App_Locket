@@ -8,17 +8,16 @@ import {
   Image,
   Switch,
   StatusBar,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const { width: screenWidth } = Dimensions.get('window');
+import { useAuth } from "../src/context/AuthContext";
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { logout } = useAuth();
   const [widgetChainEnabled, setWidgetChainEnabled] = useState(true);
   const [showAccount, setShowAccount] = useState(true);
 
@@ -93,7 +92,13 @@ export default function ProfileScreen() {
       'Bạn có chắc chắn muốn đăng xuất?',
       [
         { text: 'Hủy', style: 'cancel' },
-        { text: 'Đăng xuất', onPress: () => console.log('Logout') }
+        {
+          text: 'Đăng xuất',
+          onPress: () => {
+            logout();
+            router.replace('/');
+          }
+        }
       ]
     );
   };

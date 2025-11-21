@@ -1,16 +1,26 @@
+import { useEffect } from "react";
 import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router, Stack } from "expo-router";
-import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useLoginForm } from "../src/context/LoginContext";
+import { useAuth } from "../src/context/AuthContext";
+
 export default function LoginScreen() {
-  const [email, setEmail] = useState("");
+  const { identifier, setIdentifier } = useLoginForm();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      router.replace("/home");
+    }
+  }, [user]);
 
   const handleContinue = () => {
-    if (email.trim()) {
-      // Navigate to password screen
-      router.push("/login/password");
-    }
+    const value = identifier.trim();
+    if (!value) return;
+    setIdentifier(value);
+    router.push("/login/password");
   };
 
   const handleUsePhone = () => {
@@ -18,7 +28,7 @@ export default function LoginScreen() {
     router.push("/login/phone");
   };
 
-  const isFormValid = email.trim();
+  const isFormValid = identifier.trim().length > 0;
 
   return (
     <>
@@ -57,8 +67,8 @@ export default function LoginScreen() {
               style={styles.input}
               placeholder="Địa chỉ email"
               placeholderTextColor="#999999"
-              value={email}
-              onChangeText={setEmail}
+              value={identifier}
+              onChangeText={setIdentifier}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
