@@ -79,6 +79,20 @@ export default function RootLayout() {
         }} 
       />
       <Stack.Screen 
+        name="login/forgot-password" 
+        options={{ 
+          headerShown: false,
+          presentation: 'modal'
+        }} 
+      />
+      <Stack.Screen 
+        name="login/forgot-password-otp" 
+        options={{ 
+          headerShown: false,
+          presentation: 'modal'
+        }} 
+      />
+      <Stack.Screen 
         name="photo-preview" 
         options={{ 
           headerShown: false,
@@ -87,6 +101,15 @@ export default function RootLayout() {
       />
       <Stack.Screen 
         name="home" 
+        options={{ 
+          headerShown: false,
+          navigationBarColor: '#000000',
+          statusBarStyle: 'light',
+          statusBarBackgroundColor: '#000000'
+        }} 
+      />
+      <Stack.Screen 
+        name="messages" 
         options={{ 
           headerShown: false,
           navigationBarColor: '#000000',

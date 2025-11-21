@@ -48,3 +48,23 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Configure API environment
+
+Expo makes any variable that starts with `EXPO_PUBLIC_` available in the app at build time, so we can safely point the frontend to different API domains without touching the source.
+
+1. **Create a `.env` file** in the project root (same level as `package.json`) and add the backend URLs that match your current environment:
+
+   ```
+   EXPO_PUBLIC_API_URL=http://localhost:4000/api
+   EXPO_PUBLIC_ANDROID_API_URL=http://10.0.2.2:4000/api
+   ```
+
+   When targeting a hosted backend, replace the values with your domain. For local development keep the defaults above—Android emulator needs the `10.0.2.2` loopback while iOS simulator/physical devices can reach `localhost`/`127.0.0.1` via Metro’s proxy.
+
+2. **Restart Expo** (`npx expo start --clear`) whenever you change `.env`, because env variables are resolved at bundle time.
+
+3. **Use the variables in code.** `src/config/api.ts` now auto-detects the platform and reads from `EXPO_PUBLIC_ANDROID_API_URL` on Android or `EXPO_PUBLIC_API_URL` elsewhere, so any service that imports from there will automatically pick up the correct domain.
+
+4. **Share defaults without secrets.** Commit a `.env.example` (same content as above) so teammates know which keys to set, but keep your personal `.env` ignored (already covered in `.gitignore`).
+

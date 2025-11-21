@@ -164,6 +164,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     textDecorationLine: 'underline',
+    marginBottom: 20,
   },
   footer: {
     paddingHorizontal: 20,

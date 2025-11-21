@@ -179,7 +179,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           {/* Chat Icon */}
-          <TouchableOpacity style={styles.headerButton}>
+          <TouchableOpacity style={styles.headerButton} onPress={() => router.push('/messages')}>
             <View style={styles.chatIcon}>
               <Ionicons name="chatbubble-outline" size={24} color="white" />
             </View>

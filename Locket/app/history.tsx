@@ -125,7 +125,7 @@ export default function HistoryScreen() {
   };
 
   const handleChat = () => {
-    console.log('Open chat');
+    router.push('/messages');
   };
 
   const handleFriends = () => {
