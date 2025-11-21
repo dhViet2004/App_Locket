@@ -3,9 +3,11 @@ import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRegisterForm } from "../../src/context/RegisterContext";
 
 export default function EmailScreen() {
-  const [email, setEmail] = useState("");
+  const { data, setEmail } = useRegisterForm();
+  const [email, setEmailInput] = useState(data.email);
 
   // Email validation function
   const isValidEmail = (email: string) => {
@@ -14,8 +16,9 @@ export default function EmailScreen() {
   };
 
   const handleContinue = () => {
-    if (isValidEmail(email.trim())) {
-      // Navigate to next step
+    const sanitizedEmail = email.trim().toLowerCase();
+    if (isValidEmail(sanitizedEmail)) {
+      setEmail(sanitizedEmail);
       router.push("/register/password");
     }
   };
@@ -55,7 +58,7 @@ export default function EmailScreen() {
               placeholder="Địa chỉ email"
               placeholderTextColor="#666666"
               value={email}
-              onChangeText={setEmail}
+            onChangeText={setEmailInput}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}

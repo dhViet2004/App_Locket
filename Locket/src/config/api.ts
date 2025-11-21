@@ -14,5 +14,5 @@ const envUrl = Platform.select({
 export const API_BASE_URL =
   envUrl ??
   (Platform.OS === 'android' ? DEFAULT_ANDROID_URL : DEFAULT_IOS_URL);
-
+  console.log('API_BASE_URL', API_BASE_URL);
 

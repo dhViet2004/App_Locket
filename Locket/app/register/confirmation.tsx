@@ -1,11 +1,14 @@
-import { Text, View, StyleSheet, TouchableOpacity, Share, Alert } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, Share, Alert, ActivityIndicator } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams, Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRegisterForm } from "../../src/context/RegisterContext";
 
 export default function ConfirmationScreen() {
   // Get username from route params
-  const { username } = useLocalSearchParams<{ username: string }>();
+  const params = useLocalSearchParams<{ username?: string }>();
+  const { data, submit, loading, reset } = useRegisterForm();
+  const username = params.username ?? data.username;
   
   const handleShare = async () => {
     try {
@@ -25,9 +28,15 @@ export default function ConfirmationScreen() {
     }
   };
 
-  const handleContinue = () => {
-    // Navigate to widget setup screen
-    router.push("/register/widget");
+  const handleContinue = async () => {
+    try {
+      await submit();
+      reset();
+      router.push("/register/widget");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể đăng ký. Vui lòng thử lại.';
+      Alert.alert('Đăng ký thất bại', message);
+    }
   };
 
   return (
@@ -73,8 +82,16 @@ export default function ConfirmationScreen() {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-          <Text style={styles.continueButtonText}>Tiếp tục</Text>
+        <TouchableOpacity 
+          style={[styles.continueButton, loading && styles.continueButtonDisabled]} 
+          onPress={handleContinue}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#000000" />
+          ) : (
+            <Text style={styles.continueButtonText}>Tiếp tục</Text>
+          )}
         </TouchableOpacity>
       </View>
       </SafeAreaView>
@@ -186,6 +203,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  continueButtonDisabled: {
+    opacity: 0.6,
   },
   continueButtonText: {
     color: '#000000',

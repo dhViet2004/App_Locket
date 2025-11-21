@@ -3,11 +3,13 @@ import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRegisterForm } from "../../src/context/RegisterContext";
 
 export default function UsernameScreen() {
-  const [username, setUsername] = useState("");
+  const { data, setUsername: persistUsername } = useRegisterForm();
+  const [username, setUsername] = useState(data.username);
   const [isValidating, setIsValidating] = useState(false);
-  const [isAvailable, setIsAvailable] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(data.username.length >= 3);
 
   // Simulate username validation
   const validateUsername = async (username: string) => {
@@ -31,10 +33,11 @@ export default function UsernameScreen() {
 
   const handleContinue = () => {
     if (isAvailable && username.trim()) {
-      // Navigate to confirmation screen with username
+      const trimmed = username.trim();
+      persistUsername(trimmed);
       router.push({
         pathname: "/register/confirmation",
-        params: { username: username.trim() }
+        params: { username: trimmed }
       });
     }
   };

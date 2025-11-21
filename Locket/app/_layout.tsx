@@ -1,18 +1,20 @@
 import { Stack } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { RegisterProvider } from "../src/context/RegisterContext";
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <Stack
-          screenOptions={{
-            navigationBarColor: '#000000',
-            statusBarStyle: 'light',
-            statusBarBackgroundColor: '#000000',
-          }}
-        >
+        <RegisterProvider>
+          <Stack
+            screenOptions={{
+              navigationBarColor: '#000000',
+              statusBarStyle: 'light',
+              statusBarBackgroundColor: '#000000',
+            }}
+          >
       <Stack.Screen 
         name="index" 
         options={{ 
@@ -118,6 +120,7 @@ export default function RootLayout() {
         }} 
       />
       </Stack>
+        </RegisterProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

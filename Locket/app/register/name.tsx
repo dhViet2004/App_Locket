@@ -3,14 +3,17 @@ import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRegisterForm } from "../../src/context/RegisterContext";
 
 export default function NameScreen() {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const { data, setFirstName, setLastName } = useRegisterForm();
+  const [firstName, setFirstNameInput] = useState(data.firstName);
+  const [lastName, setLastNameInput] = useState(data.lastName);
 
   const handleContinue = () => {
     if (firstName.trim() && lastName.trim()) {
-      // Navigate to username screen
+      setFirstName(firstName.trim());
+      setLastName(lastName.trim());
       router.push("/register/username");
     }
   };
@@ -53,7 +56,7 @@ export default function NameScreen() {
             placeholder="Tên"
             placeholderTextColor="#666666"
             value={firstName}
-            onChangeText={setFirstName}
+            onChangeText={setFirstNameInput}
             autoCapitalize="words"
             autoCorrect={false}
             autoFocus
@@ -66,7 +69,7 @@ export default function NameScreen() {
             placeholder="Họ"
             placeholderTextColor="#666666"
             value={lastName}
-            onChangeText={setLastName}
+            onChangeText={setLastNameInput}
             autoCapitalize="words"
             autoCorrect={false}
           />

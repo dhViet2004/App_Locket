@@ -3,10 +3,12 @@ import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRegisterForm } from "../../src/context/RegisterContext";
 
 export default function PasswordScreen() {
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const { data, setPassword } = useRegisterForm();
+  const [password, setPasswordInput] = useState(data.password);
+  const [confirmPassword, setConfirmPassword] = useState(data.password);
 
   // Password validation function
   const isValidPassword = (password: string) => {
@@ -15,7 +17,7 @@ export default function PasswordScreen() {
 
   const handleContinue = () => {
     if (isValidPassword(password) && password === confirmPassword) {
-      // Navigate to next step or complete registration
+      setPassword(password);
       router.push("/register/name");
     }
   };
@@ -58,7 +60,7 @@ export default function PasswordScreen() {
               placeholder="Mật khẩu"
               placeholderTextColor="#666666"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={setPasswordInput}
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
