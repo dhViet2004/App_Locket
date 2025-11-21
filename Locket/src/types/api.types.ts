@@ -51,4 +51,14 @@ export interface VerifyOtpResponse extends AuthResponse {
   isNewUser: boolean;
 }
 
+export interface ResetPasswordRequest {
+  identifier: string;
+  code: string;
+  newPassword: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
+}
+
 

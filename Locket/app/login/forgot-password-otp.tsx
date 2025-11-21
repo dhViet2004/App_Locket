@@ -1,18 +1,81 @@
-import { Text, View, StyleSheet, TouchableOpacity, TextInput } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { isAxiosError } from "axios";
+import { verifyOtpApi } from "../../src/api/services/auth.service";
 
 export default function ForgotPasswordOTPScreen() {
   const [otp, setOtp] = useState("");
-  const { email } = useLocalSearchParams<{ email?: string }>();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { email, type } = useLocalSearchParams<{ email?: string; type?: string }>();
 
-  const handleVerify = () => {
-    if (otp.trim()) {
-      // Ở đây sau khi xác thực OTP thành công có thể điều hướng tới màn hình đặt lại mật khẩu
-      // Tạm thời quay lại màn hình đăng nhập
-      router.replace("/login");
+  useEffect(() => {
+    console.log("🟢 [FORGOT PASSWORD OTP] Màn hình nhập OTP đã được mở");
+    console.log("🟢 [FORGOT PASSWORD OTP] Email nhận OTP:", email);
+    console.log("🟢 [FORGOT PASSWORD OTP] Loại OTP:", type || "email");
+    console.log("🟢 [FORGOT PASSWORD OTP] API /api/auth/send-otp đã được gọi thành công trước đó");
+  }, [email, type]);
+
+  const handleVerify = async () => {
+    const trimmedOtp = otp.trim();
+    
+    if (!trimmedOtp) {
+      setError("Vui lòng nhập mã OTP");
+      return;
+    }
+
+    if (trimmedOtp.length !== 6) {
+      setError("Mã OTP phải có 6 chữ số");
+      return;
+    }
+
+    if (!email) {
+      setError("Thông tin không hợp lệ. Vui lòng thử lại.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    console.log("🔵 [FORGOT PASSWORD OTP] Bắt đầu xác thực OTP");
+    console.log("🔵 [FORGOT PASSWORD OTP] Gọi API: POST /api/auth/verify-otp");
+    console.log("🔵 [FORGOT PASSWORD OTP] Request body:", { identifier: email, code: trimmedOtp });
+
+    try {
+      const response = await verifyOtpApi({
+        identifier: email,
+        code: trimmedOtp,
+      });
+      
+      console.log("✅ [FORGOT PASSWORD OTP] API gọi thành công!");
+      console.log("✅ [FORGOT PASSWORD OTP] Response:", JSON.stringify(response, null, 2));
+      console.log("✅ [FORGOT PASSWORD OTP] Chuyển sang màn hình đặt lại mật khẩu");
+      
+      router.push({
+        pathname: "/login/reset-password",
+        params: { 
+          email: email,
+          code: trimmedOtp,
+        },
+      } as any);
+    } catch (err) {
+      console.error("❌ [FORGOT PASSWORD OTP] Lỗi khi gọi API:", err);
+      let message = "Mã OTP không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.";
+      if (isAxiosError(err)) {
+        const errorMessage = (err.response?.data as { message?: string })?.message;
+        console.error("❌ [FORGOT PASSWORD OTP] Error response:", err.response?.data);
+        console.error("❌ [FORGOT PASSWORD OTP] Error status:", err.response?.status);
+        message = errorMessage ?? message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setError(message);
+      Alert.alert("Lỗi", message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -41,20 +104,43 @@ export default function ForgotPasswordOTPScreen() {
             : "Chúng tôi đã gửi mã OTP đến email của bạn. Vui lòng kiểm tra hộp thư của bạn."}
         </Text>
 
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
             placeholder="Mã OTP"
             placeholderTextColor="#999999"
             value={otp}
-            onChangeText={setOtp}
+            onChangeText={(value) => {
+              if (error) {
+                setError(null);
+              }
+              setOtp(value);
+            }}
             keyboardType="number-pad"
             maxLength={6}
             autoFocus
+            editable={!loading}
           />
         </View>
 
-        <TouchableOpacity style={styles.resendButton}>
+        <TouchableOpacity 
+          style={styles.resendButton}
+          onPress={() => {
+            if (email) {
+              router.push({
+                pathname: "/login/forgot-password",
+                params: { email },
+              } as any);
+            }
+          }}
+          disabled={loading}
+        >
           <Text style={styles.resendButtonText}>Gửi lại mã</Text>
         </TouchableOpacity>
       </View>
@@ -67,9 +153,13 @@ export default function ForgotPasswordOTPScreen() {
             isFormValid ? styles.verifyButtonActive : styles.verifyButtonInactive,
           ]}
           onPress={handleVerify}
-          disabled={!isFormValid}
+          disabled={!isFormValid || loading}
         >
-          <Text style={styles.verifyButtonText}>Xác thực</Text>
+          {loading ? (
+            <ActivityIndicator color="#000000" />
+          ) : (
+            <Text style={styles.verifyButtonText}>Xác thực</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -120,6 +210,19 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     textAlign: "center",
     lineHeight: 22,
+  },
+  errorContainer: {
+    backgroundColor: "#2A1A1A",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#FF4444",
+  },
+  errorText: {
+    color: "#FF4444",
+    fontSize: 14,
+    textAlign: "center",
   },
   inputContainer: {
     marginBottom: 20,

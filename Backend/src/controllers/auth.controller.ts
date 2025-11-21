@@ -46,3 +46,23 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
 	const result = await AuthService.verifyOTP(identifier, code);
 	return res.status(200).json(ok(result, 'OTP verified successfully'));
 });
+
+/**
+ * Đặt lại mật khẩu sau khi verify OTP
+ * POST /api/auth/reset-password
+ * Body: { identifier: string, code: string, newPassword: string }
+ */
+export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
+	const { identifier, code, newPassword } = req.body as { identifier: string; code: string; newPassword: string };
+
+	if (!identifier || !code || !newPassword) {
+		return res.status(400).json({ success: false, message: 'Phone/email, OTP code, and new password are required' });
+	}
+
+	if (newPassword.length < 6) {
+		return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+	}
+
+	const result = await AuthService.resetPassword(identifier, code, newPassword);
+	return res.status(200).json(ok(result, 'Password reset successfully'));
+});

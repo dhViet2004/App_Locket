@@ -201,6 +201,83 @@ function generateToken(userId: string) {
 	return jwt.sign({ sub: userId }, env.JWT_SECRET as jwt.Secret, options);
 }
 
+/**
+ * Đặt lại mật khẩu sau khi verify OTP
+ * @param identifier - Số điện thoại hoặc email
+ * @param code - Mã OTP
+ * @param newPassword - Mật khẩu mới
+ * @returns Thông báo thành công
+ */
+export async function resetPassword(identifier: string, code: string, newPassword: string): Promise<{ message: string }> {
+	// Detect loại identifier
+	const { type, isValid } = detectIdentifierType(identifier);
+
+	if (!isValid) {
+		throw new ApiError(400, 'Invalid phone number or email format');
+	}
+
+	// Tìm OTP (chưa verify hoặc đã verify trong vòng 10 phút) và chưa hết hạn
+	// Cho phép dùng OTP đã verified trong vòng 10 phút để reset password
+	const tenMinutesAgo = new Date();
+	tenMinutesAgo.setMinutes(tenMinutesAgo.getMinutes() - 10);
+	
+	const otpRecord = await OTP.findOne({
+		type,
+		identifier,
+		code,
+		expiresAt: { $gt: new Date() },
+		$or: [
+			{ verified: false },
+			{ verified: true, updatedAt: { $gte: tenMinutesAgo } }
+		],
+	});
+
+	if (!otpRecord) {
+		// Tăng số lần thử
+		const existingOTP = await OTP.findOne({ type, identifier, verified: false });
+		if (existingOTP) {
+			existingOTP.attempts += 1;
+			await existingOTP.save();
+
+			// Nếu thử quá 5 lần, xóa OTP
+			if (existingOTP.attempts >= 5) {
+				await OTP.deleteOne({ _id: existingOTP._id });
+				throw new ApiError(400, 'Too many attempts. Please request a new OTP.');
+			}
+		}
+		throw new ApiError(400, 'Invalid or expired OTP code');
+	}
+
+	// Đánh dấu OTP đã được verify (nếu chưa verify)
+	if (!otpRecord.verified) {
+		otpRecord.verified = true;
+		await otpRecord.save();
+	}
+
+	// Tìm user với identifier này
+	let user: any = null;
+
+	if (type === 'phone') {
+		user = await User.findOne({ phone: identifier });
+	} else {
+		// type === 'email'
+		user = await User.findOne({ email: identifier });
+	}
+
+	if (!user) {
+		throw new ApiError(404, 'User not found');
+	}
+
+	// Cập nhật mật khẩu mới
+	const passwordHash = await bcrypt.hash(newPassword, 10);
+	user.passwordHash = passwordHash;
+	await user.save();
+
+	return {
+		message: 'Password reset successfully',
+	};
+}
+
 function sanitize(user: any) {
 	const { _id, username, displayName, email, phone, roles, createdAt, updatedAt } = user.toObject();
 	return { id: _id, username, displayName, email, phone, roles, createdAt, updatedAt };

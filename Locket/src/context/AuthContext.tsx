@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
 import type { AuthResponse, AuthUser } from '../types/api.types';
 import { loginApi } from '../api/services/auth.service';
-import axios from 'axios';
+import { isAxiosError } from 'axios';
 import { apiClient } from '../api/client';
 
 interface AuthContextValue {
@@ -12,6 +12,7 @@ interface AuthContextValue {
   login: (identifier: string, password: string) => Promise<AuthResponse>;
   logout: () => void;
   clearError: () => void;
+  setAuthState: (payload: AuthResponse) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -24,6 +25,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearError = useCallback(() => {
     setError(null);
+  }, []);
+
+  const setAuthState = useCallback((payload: AuthResponse) => {
+    setUser(payload.user);
+    setToken(payload.token);
   }, []);
 
   const login = useCallback(async (identifier: string, password: string) => {
@@ -41,13 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await loginApi({ identifier: normalizedIdentifier, password: normalizedPassword });
-      setUser(response.data.user);
-      setToken(response.data.token);
+      setAuthState(response.data);
       return response.data;
     } catch (err) {
       let message = 'Đăng nhập thất bại. Vui lòng thử lại.';
 
-      if (axios.isAxiosError(err)) {
+      if (isAxiosError(err)) {
         message = (err.response?.data as { message?: string })?.message ?? message;
       } else if (err instanceof Error) {
         message = err.message;
@@ -58,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setAuthState]);
 
   const logout = useCallback(() => {
     setUser(null);
@@ -82,8 +87,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       clearError,
+      setAuthState,
     }),
-    [user, token, loading, error, login, logout, clearError],
+    [user, token, loading, error, login, logout, clearError, setAuthState],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

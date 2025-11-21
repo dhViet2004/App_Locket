@@ -1,23 +1,70 @@
-import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useState } from "react";
+import { isAxiosError } from "axios";
+import { sendOtpApi } from "../../src/api/services/auth.service";
 
 export default function ForgotPasswordEmailScreen() {
   const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSendOtp = () => {
-    if (email.trim()) {
-      // Giả lập gửi mã OTP về email và chuyển sang màn hình nhập OTP
+  const handleSendOtp = async () => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError("Vui lòng nhập email");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    console.log("🔵 [FORGOT PASSWORD] Bắt đầu gửi OTP cho email:", trimmed);
+    console.log("🔵 [FORGOT PASSWORD] Gọi API: POST /api/auth/send-otp");
+    console.log("🔵 [FORGOT PASSWORD] Request body:", { identifier: trimmed });
+
+    try {
+      const response = await sendOtpApi({ identifier: trimmed });
+      
+      console.log("✅ [FORGOT PASSWORD] API gọi thành công!");
+      console.log("✅ [FORGOT PASSWORD] Response:", JSON.stringify(response, null, 2));
+      console.log("✅ [FORGOT PASSWORD] Chuyển sang màn hình nhập OTP");
+      
       router.push({
         pathname: "/login/forgot-password-otp",
-        params: { email },
+        params: { 
+          email: trimmed,
+          type: response.data.type,
+        },
       } as any);
+    } catch (err) {
+      console.error("❌ [FORGOT PASSWORD] Lỗi khi gọi API:", err);
+      let message = "Không thể gửi mã OTP. Vui lòng thử lại.";
+      if (isAxiosError(err)) {
+        const errorMessage = (err.response?.data as { message?: string })?.message;
+        console.error("❌ [FORGOT PASSWORD] Error response:", err.response?.data);
+        console.error("❌ [FORGOT PASSWORD] Error status:", err.response?.status);
+        message = errorMessage ?? message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setError(message);
+      Alert.alert("Lỗi", message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const isFormValid = email.trim();
+  const handleEmailChange = (value: string) => {
+    if (error) {
+      setError(null);
+    }
+    setEmail(value);
+  };
+
+  const isFormValid = email.trim().length > 0 && !loading;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -51,13 +98,15 @@ export default function ForgotPasswordEmailScreen() {
               placeholder="Địa chỉ email"
               placeholderTextColor="#999999"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={handleEmailChange}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus
             />
           </View>
+
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
         </View>
 
         {/* Footer */}
@@ -70,7 +119,11 @@ export default function ForgotPasswordEmailScreen() {
             onPress={handleSendOtp}
             disabled={!isFormValid}
           >
-            <Text style={styles.sendButtonText}>Gửi mã OTP</Text>
+            {loading ? (
+              <ActivityIndicator color="#000000" />
+            ) : (
+              <Text style={styles.sendButtonText}>Gửi mã OTP</Text>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -138,6 +191,12 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#333333",
+  },
+  errorText: {
+    color: "#FF4D4F",
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 12,
   },
   footer: {
     paddingHorizontal: 20,
