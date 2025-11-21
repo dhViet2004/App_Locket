@@ -20,6 +20,10 @@ export const env = {
   NSFW_ENABLED: process.env.NSFW_ENABLED !== 'false', // Default: true, set to 'false' to disable
   // Groq API config (for caption suggestion)
   GROQ_API_KEY: process.env.GROQ_API_KEY || '',
+  // Firebase Admin config (for push notifications)
+  FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || '',
+  FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
+  FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL || '',
 };
 
 // eslint-disable-next-line no-console

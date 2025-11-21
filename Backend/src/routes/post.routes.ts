@@ -102,5 +102,21 @@ router.post('/:id/comment', requireAuth, commentController.createComment);
  */
 router.get('/:id/comments', commentController.getPostComments);
 
+/**
+ * GET /posts/history/:friendId
+ * Lấy lịch sử posts giữa current user và một friend
+ * Query params: page (default: 1), limit (default: 20), groupByMonth (default: false)
+ * 
+ * Response: {
+ *   success: true,
+ *   data: {
+ *     posts: Post[],
+ *     pagination: { page, limit, total, totalPages },
+ *     grouped?: { "January 2024": Post[], ... } // Only if groupByMonth=true
+ *   }
+ * }
+ */
+router.get('/history/:friendId', requireAuth, postController.getHistory);
+
 export default router;
 

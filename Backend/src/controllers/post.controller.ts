@@ -131,3 +131,45 @@ export const suggestCaption = asyncHandler(async (req: PostRequest, res: Respons
     );
   }
 });
+
+/**
+ * Lấy lịch sử posts giữa current user và một friend
+ * GET /posts/history/:friendId
+ * Query params: page (default: 1), limit (default: 20), groupByMonth (default: false)
+ */
+export const getHistory = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.userId) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const currentUserId = req.userId;
+  const friendId = req.params.friendId;
+
+  if (!friendId) {
+    throw new ApiError(400, 'friendId is required');
+  }
+
+  // Parse query params
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 20;
+  const groupByMonth = req.query.groupByMonth === 'true' || req.query.groupByMonth === '1';
+
+  // Validate pagination
+  if (page < 1) {
+    throw new ApiError(400, 'page must be greater than 0');
+  }
+  if (limit < 1 || limit > 100) {
+    throw new ApiError(400, 'limit must be between 1 and 100');
+  }
+
+  // Gọi service để lấy history
+  const result = await postService.getHistoryWithFriend(
+    currentUserId,
+    friendId,
+    page,
+    limit,
+    groupByMonth
+  );
+
+  return res.status(200).json(ok(result, 'History retrieved successfully'));
+});

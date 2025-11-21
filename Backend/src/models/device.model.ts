@@ -1,10 +1,9 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IDevice extends Document {
-  user: Types.ObjectId;
+  userId: Types.ObjectId;
+  fcmToken: string;
   platform: 'ios' | 'android';
-  pushToken: string;
-  appVersion?: string;
   lastActiveAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -12,15 +11,14 @@ export interface IDevice extends Document {
 
 const DeviceSchema = new Schema<IDevice>(
   {
-    user: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    fcmToken: { type: String, required: true, unique: true, index: true },
     platform: { type: String, enum: ['ios', 'android'], required: true },
-    pushToken: { type: String, required: true, unique: true },
-    appVersion: { type: String },
-    lastActiveAt: { type: Date },
+    lastActiveAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
-DeviceSchema.index({ user: 1, lastActiveAt: -1 });
+DeviceSchema.index({ userId: 1, lastActiveAt: -1 });
 
 export const Device = mongoose.model<IDevice>('Device', DeviceSchema);
