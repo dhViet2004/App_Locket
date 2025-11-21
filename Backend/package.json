@@ -15,7 +15,7 @@
   "license": "ISC",
   "description": "Express + TypeScript backend for Locket apps",
   "dependencies": {
-    "@tensorflow/tfjs": "^3.21.0",
+    "@tensorflow/tfjs": "^4.22.0",
     "@types/socket.io": "^3.0.1",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^2.8.0",

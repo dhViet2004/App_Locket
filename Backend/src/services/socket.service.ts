@@ -6,6 +6,23 @@ import { createMessage, findOrCreateConversation } from './chat.service';
 import { Message } from '../models/message.model';
 import { Conversation } from '../models/conversation.model';
 
+// Singleton để lưu io instance
+let ioInstance: SocketIOServer | null = null;
+
+/**
+ * Set io instance (được gọi từ server.ts khi khởi tạo)
+ */
+export function setSocketIOInstance(io: SocketIOServer) {
+  ioInstance = io;
+}
+
+/**
+ * Get io instance để emit events từ service/controller
+ */
+export function getSocketIOInstance(): SocketIOServer | null {
+  return ioInstance;
+}
+
 // Interface cho authenticated socket
 interface AuthenticatedSocket extends Socket {
   userId?: string;

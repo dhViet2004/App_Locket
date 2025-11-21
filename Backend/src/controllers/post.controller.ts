@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { Types } from 'mongoose';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { postService } from '../services/post.service';
 import { groqService } from '../services/groq.service';
@@ -263,4 +264,56 @@ export const remove = asyncHandler(async (req: AuthRequest, res: Response) => {
   await postService.deletePost(postId, userId);
 
   return res.status(200).json(ok({ postId }, 'Post deleted successfully'));
+});
+
+/**
+ * Đánh dấu bài viết đã được xem (Mark as Seen)
+ * POST /posts/:id/seen
+ */
+export const markAsSeen = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.userId) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const postId = req.params.id;
+  const userId = req.userId;
+
+  if (!postId) {
+    throw new ApiError(400, 'Post ID is required');
+  }
+
+  const post = await postService.markPostAsSeen(postId, userId);
+
+  return res.status(200).json(ok(post, 'Post marked as seen successfully'));
+});
+
+/**
+ * Lấy danh sách bài viết của một user (User Profile Feed / Wall)
+ * GET /posts/user/:userId?limit=10&cursor=2023-10-25T10:00:00.000Z
+ */
+export const getUserWall = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.userId) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const targetUserId = req.params.userId;
+  const currentUserId = req.userId;
+
+  if (!targetUserId) {
+    throw new ApiError(400, 'User ID is required');
+  }
+
+  // Validate targetUserId format
+  if (!Types.ObjectId.isValid(targetUserId)) {
+    throw new ApiError(400, 'Invalid user ID format');
+  }
+
+  // Lấy limit và cursor từ query params
+  const limit = Math.min(Math.max(parseInt((req.query?.limit as string) || '10'), 1), 50); // Max 50
+  const cursor = (req.query?.cursor as string) || undefined;
+
+  // Gọi service để lấy posts
+  const result = await postService.getUserWall(currentUserId, targetUserId, limit, cursor);
+
+  return res.status(200).json(ok(result, 'User wall retrieved successfully'));
 });

@@ -33,7 +33,7 @@ export async function register(username: string, password: string, email?: strin
 }
 
 export async function login(identifier: string, password: string) {
-	const user = await User.findOne({ $or: [{ username: identifier }, { email: identifier }] });
+	const user = await User.findOne({ $or: [{ username: identifier }, { email: identifier }] }).select('+passwordHash');
 	if (!user) throw new ApiError(401, 'Invalid credentials');
 	const valid = await bcrypt.compare(password, user.passwordHash);
 	if (!valid) throw new ApiError(401, 'Invalid credentials');
