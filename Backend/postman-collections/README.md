@@ -16,6 +16,7 @@ postman-collections/
 ├── comment.collection.json      # Comment endpoints
 ├── chat.collection.json         # Chat & messaging
 ├── friendship.collection.json   # Friend management
+├── invite.collection.json       # Invite link & deep linking
 └── admin.collection.json        # Admin operations
 ```
 
@@ -93,7 +94,11 @@ Sau khi import, bạn cần cấu hình các biến collection:
 - Send Friend Request
 - Accept Friend Request
 
-### 9. Admin (`admin.collection.json`)
+### 9. Invite (`invite.collection.json`)
+- Resolve Invite (POST /api/invites/resolve)
+- Get Invite Page (GET /invite/:username) - HTML page với deep linking
+
+### 10. Admin (`admin.collection.json`)
 - Ban User
 - Unban User
 - Delete Post

@@ -153,3 +153,138 @@ export async function rejectRequest(requestId: string, userId: string): Promise<
   await Friendship.findByIdAndDelete(requestId);
 }
 
+/**
+ * Lấy danh sách bạn bè (status = 'accepted')
+ * @param userId - ID của user hiện tại
+ * @returns Danh sách bạn bè với thông tin đã populate
+ */
+export async function getFriendsList(userId: string): Promise<IFriendship[]> {
+  const friendships = await Friendship.find({
+    $or: [
+      { userA: new Types.ObjectId(userId), status: 'accepted' },
+      { userB: new Types.ObjectId(userId), status: 'accepted' },
+    ],
+  })
+    .populate('userA', 'username displayName avatarUrl')
+    .populate('userB', 'username displayName avatarUrl')
+    .sort({ acceptedAt: -1 })
+    .lean();
+
+  return friendships as IFriendship[];
+}
+
+/**
+ * Lấy danh sách lời mời đang pending mà user nhận được
+ * @param userId - ID của user hiện tại (người nhận)
+ * @returns Danh sách friend requests với thông tin người gửi đã populate
+ */
+export async function getPendingRequests(userId: string): Promise<IFriendship[]> {
+  const friendships = await Friendship.find({
+    $or: [
+      { userA: new Types.ObjectId(userId), status: 'pending' },
+      { userB: new Types.ObjectId(userId), status: 'pending' },
+    ],
+  })
+    .populate('userA', 'username displayName avatarUrl')
+    .populate('userB', 'username displayName avatarUrl')
+    .populate('requestedBy', 'username displayName avatarUrl')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  // Lọc chỉ lấy những request mà user hiện tại là người nhận (không phải người gửi)
+  const pendingRequests = friendships.filter((friendship) => {
+    const requestedById = (friendship.requestedBy as any)?._id?.toString();
+    return requestedById !== userId;
+  });
+
+  return pendingRequests as IFriendship[];
+}
+
+/**
+ * Hủy kết bạn (xóa quan hệ bạn bè)
+ * @param currentUserId - ID của user hiện tại
+ * @param friendId - ID của người bạn cần hủy
+ */
+export async function unfriend(currentUserId: string, friendId: string): Promise<void> {
+  if (currentUserId === friendId) {
+    throw new ApiError(400, 'Cannot unfriend yourself');
+  }
+
+  const friendship = await Friendship.findOne({
+    $or: [
+      { userA: new Types.ObjectId(currentUserId), userB: new Types.ObjectId(friendId) },
+      { userA: new Types.ObjectId(friendId), userB: new Types.ObjectId(currentUserId) },
+    ],
+  });
+
+  if (!friendship) {
+    throw new ApiError(404, 'Friendship not found');
+  }
+
+  if (friendship.status !== 'accepted') {
+    throw new ApiError(400, 'You are not friends with this user');
+  }
+
+  // Xóa friendship
+  await Friendship.findByIdAndDelete(friendship._id);
+}
+
+/**
+ * Kiểm tra trạng thái friendship giữa 2 user
+ * @param currentUserId - ID của user hiện tại
+ * @param targetUserId - ID của user cần kiểm tra
+ * @returns Trạng thái: 'none', 'pending', 'friends', 'blocked'
+ */
+export async function checkFriendshipStatus(
+  currentUserId: string,
+  targetUserId: string
+): Promise<{
+  status: 'none' | 'pending' | 'friends' | 'blocked';
+  friendship?: IFriendship;
+  isRequestedByMe?: boolean;
+}> {
+  if (currentUserId === targetUserId) {
+    return { status: 'none' };
+  }
+
+  const friendship = await Friendship.findOne({
+    $or: [
+      { userA: new Types.ObjectId(currentUserId), userB: new Types.ObjectId(targetUserId) },
+      { userA: new Types.ObjectId(targetUserId), userB: new Types.ObjectId(currentUserId) },
+    ],
+  })
+    .populate('userA', 'username displayName avatarUrl')
+    .populate('userB', 'username displayName avatarUrl')
+    .lean();
+
+  if (!friendship) {
+    return { status: 'none' };
+  }
+
+  const requestedById = (friendship.requestedBy as any)?.toString();
+  const isRequestedByMe = requestedById === currentUserId;
+
+  switch (friendship.status) {
+    case 'accepted':
+      return {
+        status: 'friends',
+        friendship: friendship as IFriendship,
+        isRequestedByMe,
+      };
+    case 'pending':
+      return {
+        status: 'pending',
+        friendship: friendship as IFriendship,
+        isRequestedByMe,
+      };
+    case 'blocked':
+      return {
+        status: 'blocked',
+        friendship: friendship as IFriendship,
+        isRequestedByMe,
+      };
+    default:
+      return { status: 'none' };
+  }
+}
+
