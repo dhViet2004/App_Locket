@@ -1,13 +1,17 @@
-import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, ScrollView } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, ScrollView, ActivityIndicator } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRegisterForm } from "../../src/context/RegisterContext";
+import { checkEmailApi } from "../../src/api/services/auth.service";
 
 export default function EmailScreen() {
   const { data, setEmail } = useRegisterForm();
   const [email, setEmailInput] = useState(data.email);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Email validation function
   const isValidEmail = (email: string) => {
@@ -15,13 +19,58 @@ export default function EmailScreen() {
     return emailRegex.test(email);
   };
 
+  // Check email availability with debounce
+  useEffect(() => {
+    const trimmedEmail = email.trim().toLowerCase();
+    
+    // Clear previous timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Reset error when email changes
+    setEmailError(null);
+
+    // Only check if email is valid format
+    if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
+      return;
+    }
+
+    // Debounce: wait 500ms after user stops typing
+    debounceTimerRef.current = setTimeout(async () => {
+      setCheckingEmail(true);
+      try {
+        const response = await checkEmailApi(trimmedEmail);
+        if (!response.data.available) {
+          setEmailError("Email này đã được sử dụng. Vui lòng chọn email khác.");
+        } else {
+          setEmailError(null);
+        }
+      } catch (error) {
+        // Silently fail - don't show error if API fails
+        console.error("Error checking email:", error);
+      } finally {
+        setCheckingEmail(false);
+      }
+    }, 500);
+
+    // Cleanup
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [email]);
+
   const handleContinue = () => {
     const sanitizedEmail = email.trim().toLowerCase();
-    if (isValidEmail(sanitizedEmail)) {
+    if (isValidEmail(sanitizedEmail) && !emailError) {
       setEmail(sanitizedEmail);
       router.push("/register/password");
     }
   };
+
+  const isEmailValid = isValidEmail(email.trim()) && !emailError && !checkingEmail;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -53,17 +102,30 @@ export default function EmailScreen() {
           <Text style={styles.title}>Email của bạn là gì?</Text>
           
           <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Địa chỉ email"
-              placeholderTextColor="#666666"
-              value={email}
-            onChangeText={setEmailInput}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoFocus
-            />
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={[styles.input, emailError && styles.inputError]}
+                placeholder="Địa chỉ email"
+                placeholderTextColor="#666666"
+                value={email}
+                onChangeText={(value) => {
+                  setEmailInput(value);
+                  setEmailError(null);
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus
+              />
+              {checkingEmail && (
+                <View style={styles.loadingIndicator}>
+                  <ActivityIndicator size="small" color="#FFD700" />
+                </View>
+              )}
+            </View>
+            {emailError && (
+              <Text style={styles.errorText}>{emailError}</Text>
+            )}
           </View>
         </View>
 
@@ -76,9 +138,9 @@ export default function EmailScreen() {
           </Text>
           
           <TouchableOpacity 
-            style={[styles.continueButton, isValidEmail(email.trim()) ? styles.continueButtonActive : styles.continueButtonInactive]}
+            style={[styles.continueButton, isEmailValid ? styles.continueButtonActive : styles.continueButtonInactive]}
             onPress={handleContinue}
-            disabled={!isValidEmail(email.trim())}
+            disabled={!isEmailValid}
           >
             <Text style={styles.continueButtonText}>Tiếp tục</Text>
             <Text style={styles.arrowIcon}>→</Text>
@@ -139,15 +201,33 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 20,
   },
+  inputWrapper: {
+    position: 'relative',
+  },
   input: {
     backgroundColor: '#1A1A1A',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 16,
+    paddingRight: 50,
     fontSize: 16,
     color: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#333333',
+  },
+  inputError: {
+    borderColor: '#FF4444',
+  },
+  loadingIndicator: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+  },
+  errorText: {
+    color: '#FF4444',
+    fontSize: 14,
+    marginTop: 8,
+    marginLeft: 4,
   },
   footer: {
     paddingHorizontal: 20,

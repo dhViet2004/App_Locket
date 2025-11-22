@@ -1,4 +1,4 @@
-import { apiPost } from '../client';
+import { apiGet, apiPost } from '../client';
 import type {
   AuthResponse,
   LoginRequest,
@@ -9,6 +9,8 @@ import type {
   VerifyOtpResponse,
   ResetPasswordRequest,
   ResetPasswordResponse,
+  CheckEmailResponse,
+  CheckUsernameResponse,
 } from '../../types/api.types';
 
 export async function registerApi(body: RegisterRequest) {
@@ -29,6 +31,14 @@ export async function verifyOtpApi(body: VerifyOtpRequest) {
 
 export async function resetPasswordApi(body: ResetPasswordRequest) {
   return apiPost<ResetPasswordResponse, ResetPasswordRequest>('/auth/reset-password', body);
+}
+
+export async function checkEmailApi(email: string) {
+  return apiGet<CheckEmailResponse>(`/auth/check-email/${encodeURIComponent(email)}`);
+}
+
+export async function checkUsernameApi(username: string) {
+  return apiGet<CheckUsernameResponse>(`/auth/check-username/${encodeURIComponent(username)}`);
 }
 
 
