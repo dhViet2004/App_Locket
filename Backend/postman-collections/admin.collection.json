@@ -39,6 +39,16 @@
       "key": "audit_log_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "plan_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refund_id",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -372,6 +382,292 @@
           ]
         },
         "description": "Lấy thông tin chi tiết của một audit log theo ID. Chỉ Admin/SuperAdmin mới có quyền.\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"message\": \"ok\",\n  \"data\": {\n    \"_id\": \"...\",\n    \"adminId\": \"...\",\n    \"actionType\": \"BAN\",\n    \"targetResource\": \"USER\",\n    \"targetId\": \"652000000000000000000002\",\n    \"details\": {},\n    \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n  }\n}\n```"
+      }
+    },
+    {
+      "name": "Create Plan",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 201', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test('Response has success field', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('success');",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "});",
+              "",
+              "pm.test('Plan has all required fields', function () {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.data && jsonData.data.plan) {",
+              "        var plan = jsonData.data.plan;",
+              "        pm.expect(plan).to.have.property('_id');",
+              "        pm.expect(plan).to.have.property('code');",
+              "        pm.expect(plan).to.have.property('name');",
+              "        pm.expect(plan).to.have.property('price');",
+              "        ",
+              "        // Auto-save plan ID for testing",
+              "        if (plan._id) {",
+              "            pm.collectionVariables.set('plan_id', plan._id);",
+              "        }",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"premium_monthly\",\n  \"name\": \"Premium Monthly\",\n  \"description\": \"Gói Premium hàng tháng với đầy đủ tính năng\",\n  \"price\": 99000,\n  \"currency\": \"VND\",\n  \"interval\": \"month\",\n  \"intervalCount\": 1,\n  \"trialDays\": 7,\n  \"features\": {\n    \"maxPosts\": 1000,\n    \"adFree\": true,\n    \"prioritySupport\": true\n  },\n  \"isActive\": true\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/admin/plans",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "plans"]
+        },
+        "description": "Tạo Plan mới. Chỉ Admin/SuperAdmin mới có quyền.\n\n**Body Parameters:**\n- `code` (required, string): Mã gói nội bộ, phải unique\n- `name` (required, string): Tên gói\n- `description` (optional, string): Mô tả gói\n- `price` (required, number): Giá gói\n- `currency` (optional, string): Đơn vị tiền tệ (default: 'VND')\n- `interval` (required, string): Chu kỳ thanh toán - 'day', 'week', 'month', 'year'\n- `intervalCount` (optional, number): Số chu kỳ (default: 1)\n- `trialDays` (optional, number): Số ngày dùng thử (default: 0)\n- `features` (optional, object): Cấu hình tính năng\n- `isActive` (optional, boolean): Trạng thái hoạt động (default: true)\n\n**Lưu ý:**\n- Hành động này sẽ được ghi vào AdminAuditLog\n- Code phải unique, nếu trùng sẽ trả về lỗi 400\n- Plan ID sẽ được tự động lưu vào collection variable `plan_id`"
+      }
+    },
+    {
+      "name": "Update Plan",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has success field', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('success');",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "});",
+              "",
+              "pm.test('Plan has been updated', function () {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.data && jsonData.data.plan) {",
+              "        pm.expect(jsonData.data.plan).to.have.property('_id');",
+              "        pm.expect(jsonData.data.plan).to.have.property('code');",
+              "        pm.expect(jsonData.data.plan).to.have.property('name');",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Premium Monthly Updated\",\n  \"description\": \"Gói Premium hàng tháng đã được cập nhật\",\n  \"price\": 129000,\n  \"features\": {\n    \"maxPosts\": 2000,\n    \"adFree\": true,\n    \"prioritySupport\": true\n  }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/admin/plans/:planId",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "plans", ":planId"],
+          "variable": [
+            {
+              "key": "planId",
+              "value": "{{plan_id}}",
+              "description": "ID của plan cần cập nhật"
+            }
+          ]
+        },
+        "description": "Cập nhật Plan. Chỉ Admin/SuperAdmin mới có quyền.\n\n**Yêu cầu:**\n- Header: `Authorization: Bearer <token>` (token của admin)\n- User phải có role `admin` hoặc `superadmin`\n\n**Body Parameters (tất cả đều optional):**\n- `code` (optional, string): Mã gói nội bộ (phải unique nếu thay đổi)\n- `name` (optional, string): Tên gói\n- `description` (optional, string): Mô tả gói\n- `price` (optional, number): Giá gói\n- `currency` (optional, string): Đơn vị tiền tệ\n- `interval` (optional, string): Chu kỳ thanh toán - 'day', 'week', 'month', 'year'\n- `intervalCount` (optional, number): Số chu kỳ\n- `trialDays` (optional, number): Số ngày dùng thử\n- `features` (optional, object): Cấu hình tính năng\n- `isActive` (optional, boolean): Trạng thái hoạt động\n- `providerMetadata` (optional, object): Metadata payment provider\n\n**Response (200 OK):**\n```json\n{\n  \"success\": true,\n  \"message\": \"Plan updated successfully\",\n  \"data\": {\n    \"plan\": {\n      \"_id\": \"...\",\n      \"code\": \"premium_monthly\",\n      \"name\": \"Premium Monthly Updated\",\n      \"price\": 129000,\n      ...\n    }\n  }\n}\n```\n\n**Lưu ý:**\n- Hành động này sẽ được ghi vào AdminAuditLog với actionType 'UPDATE' và targetResource 'PLAN'\n- Tất cả các trường đều optional - chỉ cập nhật các trường được gửi\n- Nếu code thay đổi, phải unique (không trùng với plan khác)\n- Chỉ các trường được gửi mới được cập nhật, các trường khác giữ nguyên"
+      }
+    },
+    {
+      "name": "Deactivate Plan",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has success field', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('success');",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "});",
+              "",
+              "pm.test('Plan has been deactivated', function () {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.data && jsonData.data.plan) {",
+              "        pm.expect(jsonData.data.plan.isActive).to.be.false;",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/admin/plans/:planId",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "plans", ":planId"],
+          "variable": [
+            {
+              "key": "planId",
+              "value": "{{plan_id}}",
+              "description": "ID của plan cần vô hiệu hóa"
+            }
+          ]
+        },
+        "description": "Vô hiệu hóa Plan (soft delete - set isActive: false). Chỉ Admin/SuperAdmin mới có quyền.\n\n**Yêu cầu:**\n- Header: `Authorization: Bearer <token>` (token của admin)\n- User phải có role `admin` hoặc `superadmin`\n\n**Response (200 OK):**\n```json\n{\n  \"success\": true,\n  \"message\": \"Plan deactivated successfully\",\n  \"data\": {\n    \"plan\": {\n      \"_id\": \"...\",\n      \"code\": \"premium_monthly\",\n      \"name\": \"Premium Monthly\",\n      \"isActive\": false,\n      ...\n    }\n  }\n}\n```\n\n**Lưu ý:**\n- Hành động này sẽ được ghi vào AdminAuditLog với actionType 'UPDATE' và targetResource 'PLAN'\n- Plan không bị xóa khỏi database, chỉ set `isActive: false`\n- Plan vô hiệu hóa sẽ không xuất hiện trong danh sách public plans\n- Các subscription hiện tại sử dụng plan này vẫn hoạt động bình thường\n- Đây là soft delete, có thể kích hoạt lại bằng API Activate Plan"
+      }
+    },
+    {
+      "name": "Activate Plan",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has success field', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('success');",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "});",
+              "",
+              "pm.test('Plan has been activated', function () {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.data && jsonData.data.plan) {",
+              "        pm.expect(jsonData.data.plan.isActive).to.be.true;",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/admin/plans/:planId/activate",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "plans", ":planId", "activate"],
+          "variable": [
+            {
+              "key": "planId",
+              "value": "{{plan_id}}",
+              "description": "ID của plan cần kích hoạt"
+            }
+          ]
+        },
+        "description": "Kích hoạt lại Plan (set isActive: true). Chỉ Admin/SuperAdmin mới có quyền.\n\n**Yêu cầu:**\n- Header: `Authorization: Bearer <token>` (token của admin)\n- User phải có role `admin` hoặc `superadmin`\n\n**Response (200 OK):**\n```json\n{\n  \"success\": true,\n  \"message\": \"Plan activated successfully\",\n  \"data\": {\n    \"plan\": {\n      \"_id\": \"...\",\n      \"code\": \"premium_monthly\",\n      \"name\": \"Premium Monthly\",\n      \"isActive\": true,\n      ...\n    }\n  }\n}\n```\n\n**Lưu ý:**\n- Hành động này sẽ được ghi vào AdminAuditLog với actionType 'UPDATE' và targetResource 'PLAN'\n- Plan sẽ được set `isActive: true`\n- Plan đã kích hoạt sẽ xuất hiện trong danh sách public plans\n- Dùng để khôi phục plan sau khi đã deactivate\n- Ngoài ra, có thể dùng Update Plan API với `isActive: true` để kích hoạt lại"
+      }
+    },
+    {
+      "name": "Process Refund",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has success field', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('success');",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "});",
+              "",
+              "pm.test('Refund has been processed', function () {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.data && jsonData.data.refund) {",
+              "        var refund = jsonData.data.refund;",
+              "        pm.expect(refund).to.have.property('status');",
+              "        pm.expect(['APPROVED', 'REJECTED']).to.include(refund.status);",
+              "        pm.expect(refund).to.have.property('processedByAdminId');",
+              "        ",
+              "        // If approved, should have refundedAt",
+              "        if (refund.status === 'APPROVED') {",
+              "            pm.expect(refund).to.have.property('refundedAt');",
+              "        }",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"APPROVED\",\n  \"adminNote\": \"Đã xác nhận và hoàn tiền thành công\",\n  \"externalRefundId\": \"ref_123456789\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/admin/refunds/:refundId/process",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "refunds", ":refundId", "process"],
+          "variable": [
+            {
+              "key": "refundId",
+              "value": "{{refund_id}}",
+              "description": "ID của refund cần xử lý"
+            }
+          ]
+        },
+        "description": "Xử lý refund: phê duyệt (APPROVED) hoặc từ chối (REJECTED). Chỉ Admin/SuperAdmin mới có quyền.\n\n**Body Parameters:**\n- `status` (required, string): 'APPROVED' hoặc 'REJECTED'\n- `adminNote` (optional, string): Ghi chú của Admin\n- `externalRefundId` (optional, string): ID refund từ payment provider\n\n**Khi APPROVED:**\n- Refund status = 'APPROVED'\n- Subscription sẽ bị hủy (status = 'canceled')\n- Revenue snapshot được cập nhật\n- Audit log được ghi lại\n\n**Khi REJECTED:**\n- Refund status = 'REJECTED'\n- Subscription không bị ảnh hưởng\n- Audit log được ghi lại"
       }
     },
     {
