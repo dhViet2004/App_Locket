@@ -5,6 +5,7 @@ import { adminUserController } from '../controllers/admin_user.controller';
 import { adminPostController } from '../controllers/admin_post.controller';
 import { adminPlanController } from '../controllers/admin_plan.controller';
 import { adminRefundController } from '../controllers/admin_refund.controller';
+import { adminReportController } from '../controllers/admin_report.controller';
 import { list, getById } from '../controllers/admin_audit_log.controller';
 
 const router = Router();
@@ -26,6 +27,9 @@ router.put('/plans/:planId/activate', (req, res, next) => adminPlanController.ac
 
 // Refund Management
 router.put('/refunds/:refundId/process', (req, res, next) => adminRefundController.handleRefund(req, res, next));
+
+// Reports
+router.get('/reports/revenue', (req, res, next) => adminReportController.getRevenueReport(req, res, next));
 
 // Audit Logs
 router.get('/audit-logs', list);

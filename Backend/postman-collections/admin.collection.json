@@ -626,6 +626,67 @@
       }
     },
     {
+      "name": "Get Revenue Report",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has success field', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('success');",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "});",
+              "",
+              "pm.test('Response has revenue report data', function () {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.data) {",
+              "        pm.expect(jsonData.data).to.have.property('period');",
+              "        pm.expect(jsonData.data).to.have.property('summary');",
+              "        pm.expect(jsonData.data).to.have.property('dailyDetails');",
+              "        ",
+              "        pm.expect(jsonData.data.summary).to.have.property('totalNetRevenue');",
+              "        pm.expect(jsonData.data.summary).to.have.property('totalInvoices');",
+              "        pm.expect(jsonData.data.summary).to.have.property('currency');",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/admin/reports/revenue?startDate=2024-01-01&endDate=2024-01-31",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "reports", "revenue"],
+          "query": [
+            {
+              "key": "startDate",
+              "value": "2024-01-01",
+              "description": "Ngày bắt đầu (format: YYYY-MM-DD)"
+            },
+            {
+              "key": "endDate",
+              "value": "2024-01-31",
+              "description": "Ngày kết thúc (format: YYYY-MM-DD)"
+            }
+          ]
+        },
+        "description": "Lấy báo cáo tổng hợp doanh thu trong khoảng thời gian. Chỉ Admin/SuperAdmin mới có quyền.\n\n**Yêu cầu:**\n- Header: `Authorization: Bearer <token>` (token của admin)\n- User phải có role `admin` hoặc `superadmin`\n\n**Query Parameters:**\n- `startDate` (required, string): Ngày bắt đầu (format: YYYY-MM-DD, ví dụ: 2024-01-01)\n- `endDate` (required, string): Ngày kết thúc (format: YYYY-MM-DD, ví dụ: 2024-01-31)\n\n**Response (200 OK):**\n```json\n{\n  \"success\": true,\n  \"message\": \"Revenue report retrieved successfully\",\n  \"data\": {\n    \"period\": {\n      \"startDate\": \"2024-01-01\",\n      \"endDate\": \"2024-01-31\",\n      \"days\": 31\n    },\n    \"summary\": {\n      \"totalGrossRevenue\": 5000000,\n      \"totalNetRevenue\": 4500000,\n      \"totalRefunds\": 200000,\n      \"totalInvoices\": 50,\n      \"averageDailyRevenue\": 145161.29,\n      \"currency\": \"VND\"\n    },\n    \"dailyDetails\": [\n      {\n        \"day\": \"2024-01-01\",\n        \"subsGross\": 99000,\n        \"subsNet\": 99000,\n        \"adsRevenue\": 50000,\n        \"refunds\": 0,\n        \"totalRevenue\": 149000,\n        \"currency\": \"VND\"\n      },\n      ...\n    ]\n  }\n}\n```\n\n**Lưu ý:**\n- Khoảng thời gian tối đa là 365 ngày\n- startDate phải <= endDate\n- Doanh thu ròng = subsNet + adsRevenue - refunds\n- totalInvoices là số lượng invoice có status 'paid' trong khoảng thời gian\n- dailyDetails chứa chi tiết doanh thu theo từng ngày\n\n**Ví dụ URL:**\n```\nGET /api/admin/reports/revenue?startDate=2024-01-01&endDate=2024-01-31\n```\n\n**Lỗi có thể gặp:**\n- 400: StartDate is required and must be a string\n- 400: EndDate is required and must be a string\n- 400: Invalid startDate/endDate format\n- 400: Start date must be before or equal to end date\n- 400: Date range cannot exceed 365 days"
+      }
+    },
+    {
       "name": "Process Refund",
       "event": [
         {
