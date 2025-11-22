@@ -5,10 +5,22 @@ import { ok, ApiError } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
 
 /**
- * Lấy feed của user
- * GET /api/feed?page=1&limit=20
+ * Lấy feed của user với Cursor Pagination (Infinite Scroll)
+ * GET /api/feed?limit=10&cursor=2023-10-25T10:00:00.000Z
  * 
- * Hàm getFeed phải lấy isPremium từ req và chuyển page, limit từ query params vào Service
+ * Query params:
+ *   - limit: Số lượng items mỗi lần (default: 10, max: 50)
+ *   - cursor: Mốc thời gian (createdAt) của bài viết cuối cùng (optional)
+ * 
+ * Response:
+ *   {
+ *     "success": true,
+ *     "data": [...feedItems...],
+ *     "pagination": {
+ *       "nextCursor": "2023-10-25T10:00:00.000Z" | null,
+ *       "hasMore": true | false
+ *     }
+ *   }
  */
 export const getFeed = asyncHandler(async (req: Request, res: Response) => {
   const premiumReq = req as unknown as PremiumRequest;
@@ -18,16 +30,18 @@ export const getFeed = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(401, 'Unauthorized');
   }
 
-  // Lấy page và limit từ query params
-  const page = Math.max(parseInt((premiumReq.query?.page as string) || '1'), 1);
-  const limit = Math.min(Math.max(parseInt((premiumReq.query?.limit as string) || '20'), 1), 100); // Max 100 items
+  // Lấy limit từ query params (default: 10, max: 50)
+  const limit = Math.min(Math.max(parseInt((premiumReq.query?.limit as string) || '10'), 1), 50);
+  
+  // Lấy cursor từ query params (optional)
+  const cursor = (premiumReq.query?.cursor as string) || undefined;
   
   // Lấy isPremium từ req (đã được set bởi checkPremiumStatus middleware)
   const isPremium = premiumReq.isPremium || false;
 
-  // Gọi FeedService.getFeed với các tham số
-  const feed = await feedService.getFeed(premiumReq.userId, isPremium, page, limit);
+  // Gọi FeedService.getFeedWithCursor với các tham số
+  const result = await feedService.getFeedWithCursor(premiumReq.userId, isPremium, limit, cursor);
 
-  return res.status(200).json(ok(feed, 'Feed retrieved successfully'));
+  return res.status(200).json(ok(result, 'Feed retrieved successfully'));
 });
 

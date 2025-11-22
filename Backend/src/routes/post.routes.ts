@@ -172,5 +172,59 @@ router.put('/:id', requireAuth, postController.update);
  */
 router.delete('/:id', requireAuth, postController.remove);
 
+/**
+ * POST /posts/:id/seen
+ * Đánh dấu bài viết đã được xem (Mark as Seen)
+ * 
+ * Khi user mở ảnh lên xem, client gọi API này.
+ * Server sẽ:
+ * 1. Update seenAt vào mảng viewers của post
+ * 2. Emit socket event 'post_seen' về cho tác giả bài viết
+ * 
+ * Response: {
+ *   success: true,
+ *   data: Post (đã cập nhật viewers),
+ *   message: "Post marked as seen successfully"
+ * }
+ * 
+ * Socket Event (gửi cho tác giả):
+ * Event: 'post_seen'
+ * Data: {
+ *   postId: string,
+ *   viewedBy: string (userId),
+ *   seenAt: string (ISO date)
+ * }
+ */
+router.post('/:id/seen', requireAuth, postController.markAsSeen);
+
+/**
+ * GET /posts/user/:userId
+ * Lấy danh sách bài viết của một user (User Profile Feed / Wall)
+ * 
+ * Query params:
+ *   - limit: number (optional, default: 10, max: 50) - Số lượng posts mỗi lần
+ *   - cursor: string (optional) - Mốc thời gian (createdAt ISO string) của bài viết cuối cùng
+ * 
+ * Security:
+ *   - Cho phép xem nếu: user tự xem hoặc hai người là bạn bè (status: 'accepted')
+ *   - Chặn (403) nếu: chưa kết bạn hoặc bị block
+ * 
+ * Response: {
+ *   success: true,
+ *   data: {
+ *     data: [...posts...],
+ *     pagination: {
+ *       nextCursor: "2023-10-25T10:00:00.000Z" | null,
+ *       hasMore: true | false
+ *     }
+ *   }
+ * }
+ * 
+ * Cách sử dụng:
+ *   - Lần đầu: GET /api/posts/user/:userId?limit=10
+ *   - Lần sau: GET /api/posts/user/:userId?limit=10&cursor=2023-10-25T10:00:00.000Z
+ */
+router.get('/user/:userId', requireAuth, postController.getUserWall);
+
 export default router;
 

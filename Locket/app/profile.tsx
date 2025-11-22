@@ -17,9 +17,13 @@ import { useAuth } from "../src/context/AuthContext";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [widgetChainEnabled, setWidgetChainEnabled] = useState(true);
   const [showAccount, setShowAccount] = useState(true);
+
+  const userDisplayName = user?.displayName || user?.username || 'Người dùng';
+  const userEmail = user?.email || 'Chưa cập nhật';
+  const inviteLink = user?.username ? `locket.com/${user.username}` : 'locket.com';
 
   const handleEditProfile = () => {
     // Logic chỉnh sửa profile
@@ -171,7 +175,7 @@ export default function ProfileScreen() {
               style={styles.avatar}
             />
           </View>
-          <Text style={styles.userName}>Hoang Viet</Text>
+          <Text style={styles.userName}>{userDisplayName}</Text>
           <TouchableOpacity onPress={handleEditProfile}>
             <Text style={styles.editProfileText}>Chỉnh ảnh</Text>
           </TouchableOpacity>
@@ -193,7 +197,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.inviteButton} onPress={handleInviteFriends}>
             <View style={styles.inviteContent}>
               <Text style={styles.inviteTitle}>Mời bạn bè tham gia Locket!</Text>
-              <Text style={styles.inviteLink}>locket.com/vietxyz</Text>
+              <Text style={styles.inviteLink}>{inviteLink}</Text>
             </View>
             <Ionicons name="share-outline" size={20} color="#fff" />
           </TouchableOpacity>
@@ -222,8 +226,8 @@ export default function ProfileScreen() {
         {/* General Settings */}
         {renderSection('Tổng quát', (
           <View style={styles.settingsList}>
-            {renderSettingItem('person-outline', 'Sửa tên', 'Hoang Viet', handleEditName)}
-            {renderSettingItem('mail-outline', 'Thay đổi địa chỉ email', 'dviet037@gmail.com', handleChangeEmail)}
+            {renderSettingItem('person-outline', 'Sửa tên', userDisplayName, handleEditName)}
+            {renderSettingItem('mail-outline', 'Thay đổi địa chỉ email', userEmail, handleChangeEmail)}
           </View>
         ))}
 

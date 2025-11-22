@@ -105,7 +105,13 @@ Sau khi import, bạn cần cấu hình các biến collection:
 - Resolve Invite (POST /api/invites/resolve)
 - Get Invite Page (GET /invite/:username) - HTML page với deep linking
 
-### 10. Admin (`admin.collection.json`)
+### 10. User Settings (`user.collection.json`)
+- Change Password (POST /api/users/change-password)
+- Change Email (POST /api/users/change-email)
+- Update Profile (PUT /api/users/profile)
+- Update Avatar (PATCH /api/users/avatar)
+
+### 11. Admin (`admin.collection.json`)
 - Ban User
 - Unban User
 - Delete Post

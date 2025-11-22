@@ -1,77 +1,321 @@
-import { Text, View, StyleSheet, TouchableOpacity, TextInput } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { isAxiosError } from "axios";
+import { resetPasswordApi } from "../../src/api/services/auth.service";
 
 export default function ForgotPasswordOTPScreen() {
   const [otp, setOtp] = useState("");
-  const { email } = useLocalSearchParams<{ email?: string }>();
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const { email, type } = useLocalSearchParams<{ email?: string; type?: string }>();
 
-  const handleVerify = () => {
-    if (otp.trim()) {
-      // Ở đây sau khi xác thực OTP thành công có thể điều hướng tới màn hình đặt lại mật khẩu
-      // Tạm thời quay lại màn hình đăng nhập
-      router.replace("/login");
+  useEffect(() => {
+    console.log("🟢 [FORGOT PASSWORD OTP] Màn hình nhập OTP đã được mở");
+    console.log("🟢 [FORGOT PASSWORD OTP] Email nhận OTP:", email);
+    console.log("🟢 [FORGOT PASSWORD OTP] Loại OTP:", type || "email");
+    console.log("🟢 [FORGOT PASSWORD OTP] API /api/auth/send-otp đã được gọi thành công trước đó");
+  }, [email, type]);
+
+  const handleVerifyOtp = async () => {
+    const trimmedOtp = otp.trim();
+    
+    if (!trimmedOtp) {
+      setError("Vui lòng nhập mã OTP");
+      return;
+    }
+
+    if (trimmedOtp.length !== 6) {
+      setError("Mã OTP phải có 6 chữ số");
+      return;
+    }
+
+    if (!email) {
+      setError("Thông tin không hợp lệ. Vui lòng thử lại.");
+      return;
+    }
+
+    // Kiểm tra OTP hợp lệ và hiển thị form nhập mật khẩu
+    // Không cần verify OTP riêng, sẽ verify khi reset password
+    setOtpVerified(true);
+    setError(null);
+  };
+
+  const handleResetPassword = async () => {
+    const trimmedOtp = otp.trim();
+    const trimmedPassword = newPassword.trim();
+    const trimmedConfirm = confirmPassword.trim();
+
+    if (!trimmedOtp || trimmedOtp.length !== 6) {
+      setError("Mã OTP không hợp lệ");
+      return;
+    }
+
+    if (!trimmedPassword) {
+      setError("Vui lòng nhập mật khẩu mới");
+      return;
+    }
+
+    if (trimmedPassword.length < 6) {
+      setError("Mật khẩu phải có ít nhất 6 ký tự");
+      return;
+    }
+
+    if (!trimmedConfirm) {
+      setError("Vui lòng xác nhận mật khẩu");
+      return;
+    }
+
+    if (trimmedPassword !== trimmedConfirm) {
+      setError("Mật khẩu xác nhận không khớp");
+      return;
+    }
+
+    if (!email) {
+      setError("Thông tin không hợp lệ. Vui lòng thử lại.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    console.log("🔵 [FORGOT PASSWORD OTP] Bắt đầu đặt lại mật khẩu");
+    console.log("🔵 [FORGOT PASSWORD OTP] Gọi API: POST /api/auth/reset-password");
+    console.log("🔵 [FORGOT PASSWORD OTP] Request body:", { 
+      identifier: email, 
+      code: trimmedOtp,
+      newPassword: "***" // Không log password thực tế
+    });
+
+    try {
+      const response = await resetPasswordApi({
+        identifier: email,
+        code: trimmedOtp,
+        newPassword: trimmedPassword,
+      });
+      
+      console.log("✅ [FORGOT PASSWORD OTP] API gọi thành công!");
+      console.log("✅ [FORGOT PASSWORD OTP] Response:", JSON.stringify(response, null, 2));
+      
+      Alert.alert(
+        "Thành công",
+        "Đặt lại mật khẩu thành công. Vui lòng đăng nhập với mật khẩu mới.",
+        [
+          {
+            text: "Đăng nhập",
+            onPress: () => {
+              router.replace("/login");
+            },
+          },
+        ]
+      );
+    } catch (err) {
+      console.error("❌ [FORGOT PASSWORD OTP] Lỗi khi gọi API:", err);
+      let message = "Không thể đặt lại mật khẩu. Vui lòng thử lại.";
+      if (isAxiosError(err)) {
+        const errorMessage = (err.response?.data as { message?: string })?.message;
+        console.error("❌ [FORGOT PASSWORD OTP] Error response:", err.response?.data);
+        console.error("❌ [FORGOT PASSWORD OTP] Error status:", err.response?.status);
+        message = errorMessage ?? message;
+        
+        // Nếu OTP không hợp lệ, reset lại trạng thái
+        if (err.response?.status === 400) {
+          setOtpVerified(false);
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setError(message);
+      Alert.alert("Lỗi", message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const isFormValid = otp.trim();
+  const isOtpValid = otp.trim().length === 6;
+  const isPasswordFormValid = 
+    newPassword.trim().length >= 6 && 
+    confirmPassword.trim().length >= 6 && 
+    newPassword.trim() === confirmPassword.trim() && 
+    !loading;
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" backgroundColor="#000000" />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Main Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Nhập mã OTP</Text>
-        <Text style={styles.subtitle}>
-          {email
-            ? `Chúng tôi đã gửi mã OTP đến email ${email}. Vui lòng kiểm tra hộp thư của bạn.`
-            : "Chúng tôi đã gửi mã OTP đến email của bạn. Vui lòng kiểm tra hộp thư của bạn."}
-        </Text>
-
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Mã OTP"
-            placeholderTextColor="#999999"
-            value={otp}
-            onChangeText={setOtp}
-            keyboardType="number-pad"
-            maxLength={6}
-            autoFocus
-          />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardView}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.resendButton}>
-          <Text style={styles.resendButtonText}>Gửi lại mã</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Main Content */}
+        <View style={styles.content}>
+          <Text style={styles.title}>
+            {otpVerified ? "Đặt lại mật khẩu" : "Nhập mã OTP"}
+          </Text>
+          <Text style={styles.subtitle}>
+            {otpVerified
+              ? "Vui lòng nhập mật khẩu mới của bạn"
+              : email
+              ? `Chúng tôi đã gửi mã OTP đến email ${email}. Vui lòng kiểm tra hộp thư của bạn.`
+              : "Chúng tôi đã gửi mã OTP đến email của bạn. Vui lòng kiểm tra hộp thư của bạn."}
+          </Text>
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[
-            styles.verifyButton,
-            isFormValid ? styles.verifyButtonActive : styles.verifyButtonInactive,
-          ]}
-          onPress={handleVerify}
-          disabled={!isFormValid}
-        >
-          <Text style={styles.verifyButtonText}>Xác thực</Text>
-        </TouchableOpacity>
-      </View>
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          {!otpVerified ? (
+            <>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.otpInput}
+                  placeholder="Mã OTP"
+                  placeholderTextColor="#999999"
+                  value={otp}
+                  onChangeText={(value) => {
+                    if (error) {
+                      setError(null);
+                    }
+                    setOtp(value);
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoFocus
+                  editable={!loading}
+                />
+              </View>
+
+              <TouchableOpacity 
+                style={styles.resendButton}
+                onPress={() => {
+                  if (email) {
+                    router.push({
+                      pathname: "/login/forgot-password",
+                      params: { email },
+                    } as any);
+                  }
+                }}
+                disabled={loading}
+              >
+                <Text style={styles.resendButtonText}>Gửi lại mã</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Mật khẩu mới"
+                  placeholderTextColor="#999999"
+                  value={newPassword}
+                  onChangeText={(value) => {
+                    if (error) {
+                      setError(null);
+                    }
+                    setNewPassword(value);
+                  }}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Text style={styles.eyeIcon}>{showPassword ? "👁️" : "👁️‍🗨️"}</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Xác nhận mật khẩu"
+                  placeholderTextColor="#999999"
+                  value={confirmPassword}
+                  onChangeText={(value) => {
+                    if (error) {
+                      setError(null);
+                    }
+                    setConfirmPassword(value);
+                  }}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  <Text style={styles.eyeIcon}>{showConfirmPassword ? "👁️" : "👁️‍🗨️"}</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity 
+                style={styles.backToOtpButton}
+                onPress={() => {
+                  setOtpVerified(false);
+                  setNewPassword("");
+                  setConfirmPassword("");
+                  setError(null);
+                }}
+                disabled={loading}
+              >
+                <Text style={styles.backToOtpButtonText}>← Quay lại nhập OTP</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          {!otpVerified ? (
+            <TouchableOpacity
+              style={[
+                styles.verifyButton,
+                isOtpValid ? styles.verifyButtonActive : styles.verifyButtonInactive,
+              ]}
+              onPress={handleVerifyOtp}
+              disabled={!isOtpValid || loading}
+            >
+              <Text style={styles.verifyButtonText}>Tiếp tục</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.resetButton,
+                isPasswordFormValid ? styles.resetButtonActive : styles.resetButtonInactive,
+              ]}
+              onPress={handleResetPassword}
+              disabled={!isPasswordFormValid}
+            >
+              {loading ? (
+                <ActivityIndicator color="#000000" />
+              ) : (
+                <Text style={styles.resetButtonText}>Đặt lại mật khẩu</Text>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -80,6 +324,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000000",
+  },
+  keyboardView: {
+    flex: 1,
   },
   header: {
     flexDirection: "row",
@@ -105,7 +352,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 40,
-    justifyContent: "center",
   },
   title: {
     fontSize: 28,
@@ -121,10 +367,35 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
   },
+  errorContainer: {
+    backgroundColor: "#2A1A1A",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#FF4444",
+  },
+  errorText: {
+    color: "#FF4444",
+    fontSize: 14,
+    textAlign: "center",
+  },
   inputContainer: {
     marginBottom: 20,
+    position: "relative",
   },
   input: {
+    backgroundColor: "#1A1A1A",
+    borderRadius: 25,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingRight: 50,
+    fontSize: 16,
+    color: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#333333",
+  },
+  otpInput: {
     backgroundColor: "#1A1A1A",
     borderRadius: 25,
     paddingHorizontal: 20,
@@ -136,11 +407,31 @@ const styles = StyleSheet.create({
     textAlign: "center",
     letterSpacing: 2,
   },
+  eyeButton: {
+    position: "absolute",
+    right: 15,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    width: 40,
+  },
+  eyeIcon: {
+    fontSize: 20,
+  },
   resendButton: {
     alignSelf: "center",
     marginBottom: 20,
   },
   resendButtonText: {
+    color: "#FFD700",
+    fontSize: 14,
+  },
+  backToOtpButton: {
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  backToOtpButtonText: {
     color: "#FFD700",
     fontSize: 14,
   },
@@ -161,6 +452,23 @@ const styles = StyleSheet.create({
     backgroundColor: "#333333",
   },
   verifyButtonText: {
+    color: "#000000",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  resetButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 25,
+    alignItems: "center",
+  },
+  resetButtonActive: {
+    backgroundColor: "#FFD700",
+  },
+  resetButtonInactive: {
+    backgroundColor: "#333333",
+  },
+  resetButtonText: {
     color: "#000000",
     fontSize: 16,
     fontWeight: "600",

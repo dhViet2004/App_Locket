@@ -17,19 +17,25 @@ export interface FeedItem {
  */
 export class FeedService {
   /**
-   * Lấy feed của user (bài viết từ bạn bè + quảng cáo nếu không premium)
+   * Lấy feed của user với Cursor Pagination (Infinite Scroll)
    * @param userId - ID của user
    * @param isPremium - Trạng thái premium của user
-   * @param page - Số trang (default: 1)
-   * @param limit - Số lượng items mỗi trang (default: 20)
-   * @returns Mảng FeedItem (post hoặc ad)
+   * @param limit - Số lượng items mỗi lần (default: 10)
+   * @param cursor - Mốc thời gian (createdAt) của bài viết cuối cùng (optional)
+   * @returns FeedItems với pagination info
    */
-  async getFeed(
+  async getFeedWithCursor(
     userId: string,
     isPremium: boolean,
-    page: number = 1,
-    limit: number = 20
-  ): Promise<FeedItem[]> {
+    limit: number = 10,
+    cursor?: string
+  ): Promise<{
+    data: FeedItem[];
+    pagination: {
+      nextCursor: string | null;
+      hasMore: boolean;
+    };
+  }> {
     try {
       // 1. Lấy danh sách bạn bè: Truy vấn friendship.model để lấy danh sách ID của bạn bè (chỉ status: 'accepted')
       const friendships = await Friendship.find({
@@ -38,12 +44,6 @@ export class FeedService {
           { userB: new Types.ObjectId(userId), status: 'accepted' },
         ],
       });
-
-      // Xử lý lỗi nếu không tìm thấy bạn bè
-      if (friendships.length === 0) {
-        // Không có bạn bè, trả về mảng rỗng hoặc có thể trả về bài viết của chính user
-        // Ở đây ta vẫn cho phép xem bài viết của chính mình
-      }
 
       // Lấy danh sách friend IDs
       const friendIds = friendships.map((friendship) => {
@@ -55,36 +55,55 @@ export class FeedService {
       // Thêm chính user vào để xem bài viết của mình
       const authorIds = [...new Set([...friendIds, userId])];
 
-      // 2. Lấy bài viết: Truy vấn post.model để lấy bài viết của các ID bạn bè vừa tìm được
-      // Phân trang theo page và limit. Populate thông tin tác giả.
-      const skip = (page - 1) * limit;
-      
-      // Lấy nhiều posts hơn để có thể chèn ads
-      const postsToFetch = isPremium ? limit : limit * 2; // Lấy gấp đôi nếu có ads
-
-      const posts = await Post.find({
+      // 2. Xây dựng query với cursor pagination
+      const query: any = {
         author: { $in: authorIds.map((id) => new Types.ObjectId(id)) },
         visibility: { $in: ['friends', 'private'] },
         deletedAt: null,
-      })
-        .populate('author', 'username displayName avatarUrl') // Populate thông tin tác giả
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(postsToFetch)
-        .lean();
+      };
 
-      // Xử lý lỗi nếu không tìm thấy bài viết
-      if (posts.length === 0) {
-        return [];
+      // Nếu có cursor, thêm điều kiện lọc bài viết cũ hơn cursor
+      if (cursor) {
+        try {
+          const cursorDate = new Date(cursor);
+          query.createdAt = { $lt: cursorDate };
+        } catch (error) {
+          // Nếu cursor không hợp lệ, bỏ qua
+          console.warn('Invalid cursor format:', cursor);
+        }
       }
 
-      // 3. Convert posts thành FeedItem
-      let feedItems: FeedItem[] = posts.map((post) => ({
+      // 3. Lấy bài viết với cursor pagination
+      // Lấy thêm 1 post để kiểm tra hasMore
+      const posts = await Post.find(query)
+        .select('_id author imageUrl caption location visibility reactionCount commentCount reactionCounts viewers createdAt updatedAt')
+        .populate('author', 'username displayName avatarUrl') // Populate thông tin tác giả
+        .sort({ createdAt: -1 }) // Sắp xếp giảm dần (mới nhất lên đầu)
+        .limit(limit + 1) // Lấy thêm 1 để kiểm tra hasMore
+        .lean();
+
+      // 4. Kiểm tra hasMore (nếu lấy được nhiều hơn limit thì còn dữ liệu)
+      const hasMore = posts.length > limit;
+      const postsToProcess = hasMore ? posts.slice(0, limit) : posts;
+
+      // Nếu không có bài viết nào
+      if (postsToProcess.length === 0) {
+        return {
+          data: [],
+          pagination: {
+            nextCursor: null,
+            hasMore: false,
+          },
+        };
+      }
+
+      // 5. Convert posts thành FeedItem
+      let feedItems: FeedItem[] = postsToProcess.map((post) => ({
         type: 'post' as const,
         data: post as unknown as IPost,
       }));
 
-      // 4. Logic chèn Quảng cáo (Monetization)
+      // 6. Logic chèn Quảng cáo (Monetization)
       if (!isPremium) {
         // Nếu isPremium là false: Query ad.model.ts để lấy một danh sách quảng cáo đang hoạt động
         const activeAds = await this.getActiveAds('feed');
@@ -119,12 +138,51 @@ export class FeedService {
         }
       }
 
-      // 5. Giới hạn số lượng items theo limit
-      return feedItems.slice(0, limit);
+      // 7. Giới hạn số lượng items theo limit (sau khi chèn ads)
+      const finalFeedItems = feedItems.slice(0, limit);
+
+      // 8. Tính nextCursor (createdAt của post cuối cùng trong danh sách postsToProcess)
+      let nextCursor: string | null = null;
+      if (hasMore && postsToProcess.length > 0) {
+        // Lấy createdAt của post cuối cùng để làm cursor cho lần gọi sau
+        const lastPost = postsToProcess[postsToProcess.length - 1];
+        if (lastPost.createdAt) {
+          nextCursor = new Date(lastPost.createdAt).toISOString();
+        }
+      }
+
+      return {
+        data: finalFeedItems,
+        pagination: {
+          nextCursor,
+          hasMore: hasMore && finalFeedItems.length >= limit,
+        },
+      };
     } catch (error) {
-      console.error('Error in FeedService.getFeed:', error);
+      console.error('Error in FeedService.getFeedWithCursor:', error);
       throw new ApiError(500, 'Failed to get feed');
     }
+  }
+
+  /**
+   * Lấy feed của user (bài viết từ bạn bè + quảng cáo nếu không premium)
+   * @deprecated Sử dụng getFeedWithCursor thay thế
+   * @param userId - ID của user
+   * @param isPremium - Trạng thái premium của user
+   * @param page - Số trang (default: 1)
+   * @param limit - Số lượng items mỗi trang (default: 20)
+   * @returns Mảng FeedItem (post hoặc ad)
+   */
+  async getFeed(
+    userId: string,
+    isPremium: boolean,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<FeedItem[]> {
+    // Deprecated: Sử dụng getFeedWithCursor thay thế
+    // Implementation tạm thời để backward compatibility
+    const result = await this.getFeedWithCursor(userId, isPremium, limit);
+    return result.data;
   }
 
   /**

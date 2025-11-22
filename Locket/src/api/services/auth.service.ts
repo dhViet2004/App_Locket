@@ -7,6 +7,8 @@ import type {
   SendOtpResponse,
   VerifyOtpRequest,
   VerifyOtpResponse,
+  ResetPasswordRequest,
+  ResetPasswordResponse,
 } from '../../types/api.types';
 
 export async function registerApi(body: RegisterRequest) {
@@ -23,6 +25,10 @@ export async function sendOtpApi(body: SendOtpRequest) {
 
 export async function verifyOtpApi(body: VerifyOtpRequest) {
   return apiPost<VerifyOtpResponse, VerifyOtpRequest>('/auth/verify-otp', body);
+}
+
+export async function resetPasswordApi(body: ResetPasswordRequest) {
+  return apiPost<ResetPasswordResponse, ResetPasswordRequest>('/auth/reset-password', body);
 }
 
 

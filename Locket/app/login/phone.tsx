@@ -1,20 +1,74 @@
-import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useState } from "react";
+import axios from "axios";
+import { sendOtpApi } from "../../src/api/services/auth.service";
 
 export default function LoginPhoneScreen() {
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleContinue = () => {
-    if (phoneNumber.trim()) {
-      // Navigate to OTP verification
-      router.push("/login/otp");
+  const normalizePhoneNumber = (value: string) => {
+    const digitsOnly = value.replace(/[^\d+]/g, "");
+    if (!digitsOnly) return "";
+    if (digitsOnly.startsWith("+")) {
+      return digitsOnly;
+    }
+    const withoutLeadingZero = digitsOnly.replace(/^0+/, "");
+    return `+84${withoutLeadingZero}`;
+  };
+
+  const handleContinue = async () => {
+    const trimmed = phoneNumber.trim();
+    if (!trimmed) {
+      setError("Vui lòng nhập số điện thoại");
+      return;
+    }
+
+    const identifier = normalizePhoneNumber(trimmed);
+    if (!identifier) {
+      setError("Số điện thoại không hợp lệ");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await sendOtpApi({ identifier });
+      router.push({
+        pathname: "/login/otp",
+        params: {
+          identifier,
+          type: response.data.type,
+          displayIdentifier: trimmed,
+        },
+      });
+    } catch (err) {
+      let message = "Không thể gửi mã OTP. Vui lòng thử lại.";
+      if (axios.isAxiosError(err)) {
+        message = (err.response?.data as { message?: string })?.message ?? message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setError(message);
+      Alert.alert("Lỗi", message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const isFormValid = phoneNumber.trim();
+  const handlePhoneChange = (value: string) => {
+    if (error) {
+      setError(null);
+    }
+    setPhoneNumber(value);
+  };
+
+  const isFormValid = phoneNumber.trim().length > 0 && !loading;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -49,11 +103,13 @@ export default function LoginPhoneScreen() {
               placeholder="Số điện thoại"
               placeholderTextColor="#999999"
               value={phoneNumber}
-              onChangeText={setPhoneNumber}
+              onChangeText={handlePhoneChange}
               keyboardType="phone-pad"
               autoFocus
             />
           </View>
+
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
 
           <TouchableOpacity 
             style={styles.emailButton}
@@ -76,7 +132,11 @@ export default function LoginPhoneScreen() {
             onPress={handleContinue}
             disabled={!isFormValid}
           >
-            <Text style={styles.continueButtonText}>Tiếp tục →</Text>
+            {loading ? (
+              <ActivityIndicator color="#000000" />
+            ) : (
+              <Text style={styles.continueButtonText}>Tiếp tục →</Text>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -155,6 +215,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FFFFFF',
     padding: 0,
+  },
+  errorText: {
+    color: '#FF4D4F',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 12,
   },
   emailButton: {
     alignSelf: 'center',
