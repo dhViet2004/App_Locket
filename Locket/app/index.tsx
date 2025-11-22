@@ -1,8 +1,9 @@
 import { Text, View, StyleSheet, TouchableOpacity, Dimensions, Image } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { router, usePathname } from "expo-router";
+import { router, usePathname, useSegments, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import * as React from "react";
 import { useAuth } from "../src/context/AuthContext";
 
 const { width } = Dimensions.get('window');
@@ -10,13 +11,92 @@ const { width } = Dimensions.get('window');
 export default function Index() {
   const { user } = useAuth();
   const pathname = usePathname();
+  const segments = useSegments();
+  const hasRedirected = useRef(false);
+  const isMountedRef = useRef(false);
+  // Refs để lưu giá trị pathname và segments mới nhất
+  const pathnameRef = useRef(pathname);
+  const segmentsRef = useRef(segments);
 
+  // Đánh dấu component đã mount và update refs khi pathname/segments thay đổi
   useEffect(() => {
-    // Chỉ redirect nếu đang ở index và user đã đăng nhập
-    if (user && pathname === '/') {
-      router.replace("/home");
-    }
-  }, [user, pathname]);
+    isMountedRef.current = true;
+    pathnameRef.current = pathname;
+    segmentsRef.current = segments;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [pathname, segments]);
+
+  // QUAN TRỌNG: Sử dụng useFocusEffect thay vì useEffect để chỉ chạy khi screen được focus
+  // Điều này đảm bảo redirect chỉ xảy ra khi thực sự ở index screen, không phải khi component mount ở background
+  useFocusEffect(
+    React.useCallback(() => {
+      // Lấy giá trị pathname và segments mới nhất từ refs (luôn được update bởi useEffect)
+      const currentPathname = pathnameRef.current;
+      const currentSegments = segmentsRef.current;
+      const isOnIndexRoute = currentPathname === '/' && currentSegments.length === 0;
+      
+      // QUAN TRỌNG: Chỉ xử lý redirect khi screen được focus VÀ đang ở index route
+      // Nếu không ở index route, không làm gì cả (không log, không redirect)
+      if (!isOnIndexRoute) {
+        // Reset hasRedirected khi không ở index route
+        hasRedirected.current = false;
+        return;
+      }
+      
+      // Chỉ log và xử lý khi thực sự ở index route và screen được focus
+      console.log('[Index] useFocusEffect triggered on index route:', {
+        hasUser: !!user,
+        pathname: currentPathname,
+        segments: currentSegments.join('/'),
+        hasRedirected: hasRedirected.current,
+      });
+      
+      if (user && !hasRedirected.current) {
+        console.log('[Index] 🔄 Redirecting to /home');
+        hasRedirected.current = true;
+        // Sử dụng setTimeout để đảm bảo navigation không bị conflict
+        // Tăng delay để đảm bảo navigation state đã ổn định hoàn toàn
+        const redirectTimeout = setTimeout(() => {
+          // Triple-check: lấy pathname và segments mới nhất từ refs trước khi redirect
+          // Check lại một lần nữa để đảm bảo vẫn ở index route
+          const finalPathname = pathnameRef.current;
+          const finalSegments = segmentsRef.current;
+          const stillOnIndexRoute = finalPathname === '/' && finalSegments.length === 0;
+          
+          if (stillOnIndexRoute) {
+            console.log('[Index] ✅ Confirmed still on index route, redirecting to /home');
+            router.replace("/home");
+          } else {
+            console.log('[Index] ⏸️ Navigation state changed during redirect, cancelling:', {
+              pathname: finalPathname,
+              segments: finalSegments.join('/'),
+            });
+            hasRedirected.current = false;
+          }
+        }, 100); // Tăng delay để đảm bảo navigation state đã ổn định
+        
+        // Cleanup timeout nếu component unmount hoặc navigation state thay đổi
+        return () => {
+          clearTimeout(redirectTimeout);
+        };
+      } else if (!user) {
+        console.log('[Index] ⏸️ No user, staying on index');
+        hasRedirected.current = false;
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user]) // Chỉ phụ thuộc vào user, không phụ thuộc vào pathname/segments để tránh chạy lại khi navigate
+  );
+
+  // QUAN TRỌNG: Chỉ render UI khi thực sự ở index route
+  // Điều này giúp tránh render không cần thiết khi component vẫn mount ở background
+  const isOnIndexRoute = pathname === '/' && segments.length === 0;
+  
+  // Nếu không ở index route, return null để không render UI
+  if (!isOnIndexRoute) {
+    return null;
+  }
 
   return (
     <SafeAreaView style={styles.container}>

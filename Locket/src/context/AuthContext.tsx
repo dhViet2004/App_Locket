@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
 import type { AuthResponse, AuthUser } from '../types/api.types';
 import { loginApi } from '../api/services/auth.service';
 import { getUserProfileApi } from '../api/services/user.service';
@@ -25,6 +25,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Ref để tránh gọi refreshUser() đồng thời nhiều lần
+  const refreshUserPromiseRef = React.useRef<Promise<void> | null>(null);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -90,28 +93,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshUser = useCallback(async () => {
+    console.log('[AuthContext] refreshUser() called');
+    console.log('[AuthContext] Token state:', {
+      hasToken: !!token,
+      tokenLength: token?.length || 0,
+      tokenPreview: token ? `${token.substring(0, 20)}...` : 'null',
+    });
+    
     if (!token) {
+      console.warn('[AuthContext] ⚠️ refreshUser() skipped - no token');
       return;
     }
 
-    try {
-      const response = await getUserProfileApi();
-      setUser(response.data);
-    } catch (err) {
-      console.error('Error refreshing user:', err);
-      // Không throw error để không làm gián đoạn flow
+    // Nếu đang có một request đang chạy, trả về promise đó thay vì tạo request mới
+    if (refreshUserPromiseRef.current) {
+      console.log('[AuthContext] ⏸️ refreshUser() already in progress, reusing existing promise');
+      return refreshUserPromiseRef.current;
     }
+
+    // Tạo promise mới và lưu vào ref
+    const refreshPromise = (async () => {
+      try {
+        console.log('[AuthContext] Calling getUserProfileApi()...');
+        const response = await getUserProfileApi();
+        console.log('[AuthContext] ✅ getUserProfileApi() success:', {
+          userId: response.data?.id,
+          username: response.data?.username,
+          email: response.data?.email,
+        });
+        setUser(response.data);
+        console.log('[AuthContext] User state updated');
+      } catch (err) {
+        console.error('[AuthContext] ❌ Error refreshing user:', err);
+        console.error('[AuthContext] Error details:', {
+          isAxiosError: isAxiosError(err),
+          status: isAxiosError(err) ? err.response?.status : 'N/A',
+          message: err instanceof Error ? err.message : String(err),
+          responseData: isAxiosError(err) ? err.response?.data : 'N/A',
+        });
+        
+        // Nếu lỗi 401 (Unauthorized), token có thể đã hết hạn
+        if (isAxiosError(err) && err.response?.status === 401) {
+          console.warn('[AuthContext] ⚠️ 401 Unauthorized - token may be expired or invalid');
+          console.warn('[AuthContext] ⚠️ User may be logged out or redirected');
+        }
+        
+        // Không throw error để không làm gián đoạn flow
+      } finally {
+        // Clear promise ref khi hoàn thành (thành công hoặc lỗi)
+        refreshUserPromiseRef.current = null;
+      }
+    })();
+
+    refreshUserPromiseRef.current = refreshPromise;
+    return refreshPromise;
   }, [token]);
 
+  // Chỉ set Authorization header khi token thay đổi
+  // Không tự động gọi refreshUser để tránh vòng lặp
   useEffect(() => {
     if (token) {
       apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
-      // Refresh user info sau khi set token
-      refreshUser();
     } else {
       delete apiClient.defaults.headers.common.Authorization;
     }
-  }, [token, refreshUser]);
+  }, [token]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

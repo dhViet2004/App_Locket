@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack, useFocusEffect } from 'expo-router';
+import { useRouter, Stack, useFocusEffect, usePathname, useSegments } from 'expo-router';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../src/context/AuthContext";
 import * as ImagePicker from 'expo-image-picker';
@@ -22,18 +22,185 @@ import { isAxiosError } from 'axios';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { logout, user, updateUser, refreshUser } = useAuth();
+  const pathname = usePathname();
+  const segments = useSegments();
+  const { logout, user, updateUser, refreshUser, token } = useAuth();
   const [widgetChainEnabled, setWidgetChainEnabled] = useState(true);
   const [showAccount, setShowAccount] = useState(true);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  
+  // Refs để tránh gọi refreshUser() quá nhiều lần
+  const isRefreshingRef = React.useRef(false);
+  const lastRefreshTimeRef = React.useRef<number>(0);
+  const focusEffectMountedRef = React.useRef(false);
+  const debounceTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const REFRESH_THROTTLE_MS = 5000; // Chỉ refresh tối đa 1 lần mỗi 5 giây
+  const FOCUS_DEBOUNCE_MS = 300; // Đợi 300ms sau khi focus để đảm bảo màn hình đã focus hoàn toàn
+
+  // Debug: Log khi component mount/unmount
+  React.useEffect(() => {
+    console.log('[Profile] Component mounted');
+    console.log('[Profile] Initial state:', {
+      hasUser: !!user,
+      hasToken: !!token,
+      userId: user?.id,
+      username: user?.username,
+      pathname,
+      segments: segments.join('/'),
+    });
+    
+    return () => {
+      console.log('[Profile] Component unmounted');
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Debug: Log khi pathname hoặc segments thay đổi (navigation events)
+  React.useEffect(() => {
+    console.log('[Profile] Navigation state changed:', {
+      pathname,
+      segments: segments.join('/'),
+      hasUser: !!user,
+      hasToken: !!token,
+    });
+  }, [pathname, segments, user, token]);
+
+  // Debug: Log khi user hoặc token thay đổi
+  React.useEffect(() => {
+    console.log('[Profile] User/Token state changed:', {
+      hasUser: !!user,
+      hasToken: !!token,
+      userId: user?.id,
+      username: user?.username,
+      pathname,
+      segments: segments.join('/'),
+    });
+    
+    if (!user && token) {
+      console.warn('[Profile] ⚠️ User is null but token exists - possible auth issue');
+      console.warn('[Profile] ⚠️ This should not cause redirect - staying on profile screen');
+    }
+    if (!token) {
+      console.warn('[Profile] ⚠️ No token available');
+      console.warn('[Profile] ⚠️ This should not cause redirect - staying on profile screen');
+    }
+    
+    // QUAN TRỌNG: Không tự động redirect khi user hoặc token thay đổi
+    // Chỉ redirect khi user thực sự logout (cả user và token đều null)
+    // và chỉ khi đang ở profile screen
+    if (!user && !token && pathname === '/profile') {
+      console.warn('[Profile] ⚠️ User and token both null - user logged out');
+      console.warn('[Profile] ⚠️ Will redirect to home/index');
+      // Có thể redirect về home hoặc index nếu cần
+      // Nhưng tạm thời không redirect để tránh conflict
+    }
+  }, [user, token, pathname, segments]);
 
   // Refresh user info khi vào màn hình profile
-  // Chỉ refresh nếu có token
+  // Chỉ refresh nếu có token và chưa refresh gần đây
+  // QUAN TRỌNG: Đảm bảo profile screen được focus và không bị redirect
   useFocusEffect(
     React.useCallback(() => {
-      // Chỉ refresh nếu có token
-      refreshUser();
-    }, [refreshUser])
+      // Đánh dấu là đã mount
+      focusEffectMountedRef.current = true;
+      
+      // Clear debounce timer nếu có
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      
+      console.log('[Profile] useFocusEffect triggered - Screen focused:', {
+        pathname,
+        segments: segments.join('/'),
+        hasUser: !!user,
+        hasToken: !!token,
+      });
+      
+      // Đảm bảo chúng ta vẫn ở profile screen
+      // Nếu không, có thể có vấn đề với navigation
+      if (pathname !== '/profile') {
+        console.warn('[Profile] ⚠️ Not on profile route when focused:', pathname);
+        return;
+      }
+      
+      // Sử dụng debounce để đợi màn hình focus hoàn toàn trước khi gọi API
+      debounceTimerRef.current = setTimeout(() => {
+        // Kiểm tra lại xem component vẫn còn mounted không
+        if (!focusEffectMountedRef.current) {
+          console.log('[Profile] ⏸️ Skipping refreshUser() - component unmounted during debounce');
+          return;
+        }
+        
+        const now = Date.now();
+        const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
+        
+        console.log('[Profile] Debounced focus check', {
+          hasToken: !!token,
+          hasUser: !!user,
+          isRefreshing: isRefreshingRef.current,
+          timeSinceLastRefresh,
+          shouldRefresh: timeSinceLastRefresh > REFRESH_THROTTLE_MS,
+        });
+        
+        // Chỉ refresh nếu:
+        // 1. Có token
+        // 2. Không đang refresh
+        // 3. Đã qua thời gian throttle
+        // 4. Component vẫn còn mounted
+        if (token && !isRefreshingRef.current && timeSinceLastRefresh > REFRESH_THROTTLE_MS && focusEffectMountedRef.current) {
+          isRefreshingRef.current = true;
+          lastRefreshTimeRef.current = now;
+          
+          console.log('[Profile] Calling refreshUser()...');
+          refreshUser()
+            .then(() => {
+              // Chỉ log nếu component vẫn còn mounted
+              if (focusEffectMountedRef.current) {
+                console.log('[Profile] ✅ refreshUser() completed successfully');
+              }
+            })
+            .catch((error) => {
+              // Chỉ log nếu component vẫn còn mounted
+              if (focusEffectMountedRef.current) {
+                console.error('[Profile] ❌ refreshUser() failed:', error);
+                console.error('[Profile] Error details:', {
+                  message: error?.message,
+                  response: error?.response?.data,
+                  status: error?.response?.status,
+                });
+              }
+            })
+            .finally(() => {
+              // Chỉ reset nếu component vẫn còn mounted
+              if (focusEffectMountedRef.current) {
+                isRefreshingRef.current = false;
+              }
+            });
+        } else {
+          if (!token) {
+            console.warn('[Profile] ⚠️ Skipping refreshUser() - no token available');
+          } else if (isRefreshingRef.current) {
+            console.log('[Profile] ⏸️ Skipping refreshUser() - already refreshing');
+          } else if (timeSinceLastRefresh <= REFRESH_THROTTLE_MS) {
+            console.log('[Profile] ⏸️ Skipping refreshUser() - throttled (last refresh was', timeSinceLastRefresh, 'ms ago)');
+          } else if (!focusEffectMountedRef.current) {
+            console.log('[Profile] ⏸️ Skipping refreshUser() - component unmounted');
+          }
+        }
+      }, FOCUS_DEBOUNCE_MS);
+      
+      // Cleanup function: đánh dấu là đã unmount và clear timer
+      return () => {
+        console.log('[Profile] useFocusEffect cleanup - screen unfocused');
+        focusEffectMountedRef.current = false;
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [refreshUser, token]) // Removed 'user' from dependencies to prevent loop
   );
 
   const userDisplayName = user?.displayName || user?.username || 'Người dùng';
@@ -227,6 +394,14 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
+  // Debug: Log trước khi render
+  console.log('[Profile] Rendering profile screen:', {
+    hasUser: !!user,
+    hasToken: !!token,
+    pathname,
+    segments: segments.join('/'),
+  });
+
   return (
     <>
       <Stack.Screen 
@@ -237,19 +412,37 @@ export default function ProfileScreen() {
           statusBarBackgroundColor: '#000000'
         }} 
       />
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView 
+        style={styles.container}
+        accessibilityLabel="Profile screen"
+        importantForAccessibility="yes"
+      >
         <StatusBar barStyle="light-content" backgroundColor="#000" />
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => {
+          console.log('[Profile] Back button pressed');
+          console.log('[Profile] Current state before back:', {
+            hasUser: !!user,
+            hasToken: !!token,
+            userId: user?.id,
+          });
+          router.back();
+        }}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Hồ sơ & Cài đặt</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        accessibilityRole="scrollbar"
+        accessibilityLabel="Profile content"
+        importantForAccessibility="yes"
+      >
         {/* Profile Section */}
         <View style={styles.profileSection}>
           <TouchableOpacity 

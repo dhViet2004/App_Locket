@@ -170,7 +170,15 @@ export default function HomeScreen() {
           {/* Profile Avatar */}
           <TouchableOpacity 
             style={styles.headerButton} 
-            onPress={() => router.push('/profile')}
+            onPress={() => {
+              console.log('[Home] Profile button pressed');
+              console.log('[Home] Navigation state before push:', {
+                hasUser: !!user,
+                userId: user?.id,
+                username: user?.username,
+              });
+              router.push('/profile');
+            }}
             activeOpacity={0.7}
           >
             <View style={styles.profileIcon}>
