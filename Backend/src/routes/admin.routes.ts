@@ -6,6 +6,7 @@ import { adminPostController } from '../controllers/admin_post.controller';
 import { adminPlanController } from '../controllers/admin_plan.controller';
 import { adminRefundController } from '../controllers/admin_refund.controller';
 import { adminReportController } from '../controllers/admin_report.controller';
+import { adminAdController } from '../controllers/admin_ad.controller';
 import { list, getById } from '../controllers/admin_audit_log.controller';
 
 const router = Router();
@@ -30,6 +31,11 @@ router.put('/refunds/:refundId/process', (req, res, next) => adminRefundControll
 
 // Reports
 router.get('/reports/revenue', (req, res, next) => adminReportController.getRevenueReport(req, res, next));
+router.get('/reports/ad_performance', (req, res, next) => adminReportController.getPerformanceReport(req, res, next));
+
+// Ad Management
+router.post('/ads', (req, res, next) => adminAdController.createAd(req, res, next));
+router.put('/ads/:adId/status', (req, res, next) => adminAdController.updateAdStatus(req, res, next));
 
 // Audit Logs
 router.get('/audit-logs', list);
