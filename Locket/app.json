@@ -64,6 +64,13 @@
         {
           "cameraPermission": "Cho phép Locket sử dụng camera để chụp ảnh."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép Locket truy cập thư viện ảnh để chọn avatar.",
+          "cameraPermission": "Cho phép Locket sử dụng camera để chụp avatar."
+        }
       ]
     ],
     "experiments": {

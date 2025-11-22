@@ -9,25 +9,108 @@ import {
   Switch,
   StatusBar,
   Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter, Stack, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../src/context/AuthContext";
+import * as ImagePicker from 'expo-image-picker';
+import { updateAvatarApi } from "../src/api/services/user.service";
+import { isAxiosError } from 'axios';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { logout, user } = useAuth();
+  const { logout, user, updateUser, refreshUser } = useAuth();
   const [widgetChainEnabled, setWidgetChainEnabled] = useState(true);
   const [showAccount, setShowAccount] = useState(true);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // Refresh user info khi vào màn hình profile
+  // Chỉ refresh nếu có token
+  useFocusEffect(
+    React.useCallback(() => {
+      // Chỉ refresh nếu có token
+      refreshUser();
+    }, [refreshUser])
+  );
 
   const userDisplayName = user?.displayName || user?.username || 'Người dùng';
   const userEmail = user?.email || 'Chưa cập nhật';
   const inviteLink = user?.username ? `locket.com/${user.username}` : 'locket.com';
 
-  const handleEditProfile = () => {
-    // Logic chỉnh sửa profile
-    console.log('Edit profile');
+  const handleEditProfile = async () => {
+    try {
+      // Request permission
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Cần quyền truy cập',
+          'Vui lòng cấp quyền truy cập thư viện ảnh để chọn avatar.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        await uploadAvatar(imageUri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Lỗi', 'Không thể chọn ảnh. Vui lòng thử lại.');
+    }
+  };
+
+  const uploadAvatar = async (imageUri: string) => {
+    try {
+      setUploadingAvatar(true);
+
+      // Create FormData
+      const formData = new FormData();
+      
+      // Get file name and type from URI
+      const filename = imageUri.split('/').pop() || 'avatar.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      // Append file to FormData
+      formData.append('avatar', {
+        uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
+        name: filename,
+        type: type,
+      } as any);
+
+      // Upload avatar
+      const response = await updateAvatarApi(formData);
+      
+      // Update user in context
+      if (response.data) {
+        updateUser(response.data);
+        Alert.alert('Thành công', 'Đã cập nhật avatar thành công!');
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      let message = 'Không thể cập nhật avatar. Vui lòng thử lại.';
+      
+      if (isAxiosError(error)) {
+        message = (error.response?.data as { message?: string })?.message || message;
+      }
+      
+      Alert.alert('Lỗi', message);
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const handleUpgrade = () => {
@@ -169,15 +252,29 @@ export default function ProfileScreen() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Profile Section */}
         <View style={styles.profileSection}>
-          <View style={styles.avatarContainer}>
-            <Image
-              source={{ uri: 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761231281/taskmanagement/avatars/a0hsc7oncibdgnvhbgbp.jpg' }}
-              style={styles.avatar}
-            />
-          </View>
+          <TouchableOpacity 
+            style={styles.avatarContainer}
+            onPress={handleEditProfile}
+            disabled={uploadingAvatar}
+          >
+            {uploadingAvatar ? (
+              <View style={styles.avatarLoading}>
+                <ActivityIndicator size="large" color="#ffd700" />
+              </View>
+            ) : (
+              <Image
+                source={{ 
+                  uri: user?.avatarUrl || 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761231281/taskmanagement/avatars/a0hsc7oncibdgnvhbgbp.jpg' 
+                }}
+                style={styles.avatar}
+              />
+            )}
+          </TouchableOpacity>
           <Text style={styles.userName}>{userDisplayName}</Text>
-          <TouchableOpacity onPress={handleEditProfile}>
-            <Text style={styles.editProfileText}>Chỉnh ảnh</Text>
+          <TouchableOpacity onPress={handleEditProfile} disabled={uploadingAvatar}>
+            <Text style={[styles.editProfileText, uploadingAvatar && styles.editProfileTextDisabled]}>
+              {uploadingAvatar ? 'Đang tải lên...' : 'Chỉnh ảnh'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -348,6 +445,17 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     backgroundColor: '#333',
+  },
+  avatarLoading: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editProfileTextDisabled: {
+    opacity: 0.5,
   },
   userName: {
     fontSize: 24,

@@ -30,4 +30,16 @@ export async function apiPostForm<T>(url: string, form: FormData) {
   return res.data;
 }
 
+export async function apiPatch<T, B = unknown>(url: string, body?: B) {
+  const res = await apiClient.patch<ApiResponse<T>>(url, body);
+  return res.data;
+}
+
+export async function apiPatchForm<T>(url: string, form: FormData) {
+  const res = await apiClient.patch<ApiResponse<T>>(url, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data;
+}
+
 

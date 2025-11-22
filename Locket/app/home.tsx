@@ -1,4 +1,4 @@
-import { Text, View, StyleSheet, TouchableOpacity, Dimensions, ScrollView, TextInput, Modal, PanResponder, Animated } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, Dimensions, ScrollView, TextInput, Modal, PanResponder, Animated, Image } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Stack, useRouter, Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,11 +11,13 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import { useAuth } from "../src/context/AuthContext";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [cameraType, setCameraType] = useState<CameraType>('back');
   const [flashMode, setFlashMode] = useState<FlashMode>('off');
   const [isCameraReady, setIsCameraReady] = useState(false);
@@ -165,10 +167,23 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          {/* Profile Icon */}
-          <TouchableOpacity style={styles.headerButton} onPress={() => router.push('/profile')}>
+          {/* Profile Avatar */}
+          <TouchableOpacity 
+            style={styles.headerButton} 
+            onPress={() => router.push('/profile')}
+            activeOpacity={0.7}
+          >
             <View style={styles.profileIcon}>
-              <FontAwesome5 name="user-circle" size={24} color="white" />
+              {user?.avatarUrl ? (
+                <Image
+                  source={{
+                    uri: user.avatarUrl
+                  }}
+                  style={styles.profileAvatar}
+                />
+              ) : (
+                <FontAwesome5 name="user-circle" size={24} color="white" />
+              )}
             </View>
           </TouchableOpacity>
 
@@ -399,6 +414,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  profileAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   profileIconText: {
     fontSize: 20,

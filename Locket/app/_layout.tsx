@@ -123,6 +123,24 @@ export default function RootLayout() {
           statusBarBackgroundColor: '#000000'
         }} 
       />
+      <Stack.Screen 
+        name="profile" 
+        options={{ 
+          headerShown: false,
+          navigationBarColor: '#000000',
+          statusBarStyle: 'light',
+          statusBarBackgroundColor: '#000000'
+        }} 
+      />
+      <Stack.Screen 
+        name="history" 
+        options={{ 
+          headerShown: false,
+          navigationBarColor: '#000000',
+          statusBarStyle: 'light',
+          statusBarBackgroundColor: '#000000'
+        }} 
+      />
       </Stack>
             </LoginProvider>
           </RegisterProvider>

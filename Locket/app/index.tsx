@@ -1,11 +1,23 @@
 import { Text, View, StyleSheet, TouchableOpacity, Dimensions, Image } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { router } from "expo-router";
+import { router, usePathname } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useEffect } from "react";
+import { useAuth } from "../src/context/AuthContext";
 
 const { width } = Dimensions.get('window');
 
 export default function Index() {
+  const { user } = useAuth();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // Chỉ redirect nếu đang ở index và user đã đăng nhập
+    if (user && pathname === '/') {
+      router.replace("/home");
+    }
+  }, [user, pathname]);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" backgroundColor="#000000" />
