@@ -114,19 +114,17 @@ export const getFriends = asyncHandler(async (req: AuthRequest, res: Response) =
     const currentUserId = req.userId!;
 
     // Trả về thông tin của người bạn (không phải current user)
-    if (userAId === currentUserId) {
-      return {
-        ...friendship.userB,
-        friendshipId: friendship._id,
-        acceptedAt: friendship.acceptedAt,
-      };
-    } else {
-      return {
-        ...friendship.userA,
-        friendshipId: friendship._id,
-        acceptedAt: friendship.acceptedAt,
-      };
-    }
+    const friendUser = userAId === currentUserId ? friendship.userB : friendship.userA;
+    const friendData = friendUser as any;
+
+    return {
+      _id: friendData._id?.toString() || friendData._id,
+      username: friendData.username || '',
+      displayName: friendData.displayName || friendData.username || '',
+      avatarUrl: friendData.avatarUrl || null,
+      friendshipId: friendship._id,
+      acceptedAt: friendship.acceptedAt,
+    };
   });
 
   return res.status(200).json(ok({ friends, count: friends.length }, 'Friends list retrieved successfully'));
