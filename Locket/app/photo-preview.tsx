@@ -18,8 +18,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { isAxiosError } from 'axios';
 import { useAuth, DEFAULT_AVATAR_URL } from "../src/context/AuthContext";
-import { buildCreatePostFormData, createPostApi } from "../src/api/services/post.service";
+import { buildCreatePostFormData, createPostApi, type UploadImageFile } from "../src/api/services/post.service";
 import type { PostVisibility } from "../src/types/api.types";
+import CaptionSuggestion from "../src/components/CaptionSuggestion";
 
 const { width: screenWidth } = Dimensions.get('window');
 export default function PhotoPreviewScreen() {
@@ -64,6 +65,30 @@ export default function PhotoPreviewScreen() {
     }
   };
 
+  const imageFile = useMemo<UploadImageFile | null>(() => {
+    if (!resolvedPhotoUri) {
+      return null;
+    }
+
+    const normalizedUri =
+      Platform.OS === 'ios'
+        ? (resolvedPhotoUri as string).replace('file://', '')
+        : (resolvedPhotoUri as string);
+
+    const filename =
+      (resolvedPhotoUri as string).split('/').pop() ?? 'photo.jpg';
+    const match = /\.(\w+)$/.exec(filename.toLowerCase());
+    const extension = match ? match[1] : 'jpg';
+    const type =
+      extension === 'jpg' ? 'image/jpeg' : `image/${extension || 'jpeg'}`;
+
+    return {
+      uri: normalizedUri,
+      name: filename,
+      type,
+    };
+  }, [resolvedPhotoUri]);
+
   const handleSend = async () => {
     if (isSending) {
       return;
@@ -75,7 +100,7 @@ export default function PhotoPreviewScreen() {
       return;
     }
 
-    if (!resolvedPhotoUri) {
+    if (!imageFile || !resolvedPhotoUri) {
       Alert.alert('Thiếu ảnh', 'Không tìm thấy ảnh để gửi. Vui lòng chụp lại.');
       router.back();
       return;
@@ -84,18 +109,8 @@ export default function PhotoPreviewScreen() {
     try {
       setIsSending(true);
 
-      const normalizedUri =
-        Platform.OS === 'ios' ? resolvedPhotoUri.replace('file://', '') : resolvedPhotoUri;
-      const filename = resolvedPhotoUri.split('/').pop() ?? `photo-${Date.now()}.jpg`;
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
-
       const formData = buildCreatePostFormData(
-        {
-          uri: normalizedUri,
-          name: filename,
-          type,
-        },
+        imageFile,
         {
           caption: messageText.trim() || undefined,
           visibility,
@@ -186,6 +201,12 @@ export default function PhotoPreviewScreen() {
           <View style={styles.dot} />
           <View style={styles.dot} />
         </View>
+
+        <CaptionSuggestion
+          image={imageFile}
+          disabled={isSending}
+          onApply={setMessageText}
+        />
 
         {/* Control Buttons */}
         <View style={styles.controlButtons}>

@@ -97,4 +97,8 @@ export interface Post {
   updatedAt: string;
 }
 
+export interface CaptionSuggestionResponse {
+  caption: string;
+}
+
 

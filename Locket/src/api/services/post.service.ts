@@ -1,5 +1,15 @@
 import { apiPostForm } from '../client';
-import type { Post, PostVisibility } from '../../types/api.types';
+import type {
+  CaptionSuggestionResponse,
+  Post,
+  PostVisibility,
+} from '../../types/api.types';
+
+export interface UploadImageFile {
+  uri: string;
+  name: string;
+  type: string;
+}
 
 export interface CreatePostFormOptions {
   caption?: string;
@@ -10,7 +20,7 @@ export interface CreatePostFormOptions {
 }
 
 export function buildCreatePostFormData(
-  image: { uri: string; name: string; type: string },
+  image: UploadImageFile,
   options: CreatePostFormOptions = {},
 ) {
   const formData = new FormData();
@@ -41,6 +51,21 @@ export function buildCreatePostFormData(
 
 export async function createPostApi(formData: FormData) {
   return apiPostForm<Post>('/posts', formData);
+}
+
+function buildSuggestCaptionFormData(image: UploadImageFile) {
+  const formData = new FormData();
+  formData.append('image', image as any);
+  return formData;
+}
+
+export async function suggestCaptionApi(image: UploadImageFile) {
+  const formData = buildSuggestCaptionFormData(image);
+  return apiPostForm<CaptionSuggestionResponse>(
+    '/posts/suggest-caption',
+    formData,
+    { timeout: 60000 },
+  );
 }
 
 
