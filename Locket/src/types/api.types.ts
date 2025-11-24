@@ -101,4 +101,14 @@ export interface CaptionSuggestionResponse {
   caption: string;
 }
 
+export interface FriendSummary extends AuthUser {
+  friendshipId: string;
+  acceptedAt: string;
+}
+
+export interface FriendsListResponse {
+  friends: FriendSummary[];
+  count: number;
+}
+
 

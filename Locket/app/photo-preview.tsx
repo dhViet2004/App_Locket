@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -19,15 +19,33 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { isAxiosError } from 'axios';
 import { useAuth, DEFAULT_AVATAR_URL } from "../src/context/AuthContext";
 import { buildCreatePostFormData, createPostApi, type UploadImageFile } from "../src/api/services/post.service";
+import { getFriendsApi } from "../src/api/services/friendship.service";
 import type { PostVisibility } from "../src/types/api.types";
 import CaptionSuggestion from "../src/components/CaptionSuggestion";
 
 const { width: screenWidth } = Dimensions.get('window');
+
+type RecipientEntry = {
+  id: string;
+  name: string;
+  avatar?: string;
+  avatarUrl?: string;
+  isGroup?: boolean;
+};
+
+const GROUP_RECIPIENT: RecipientEntry = {
+  id: 'all',
+  name: 'Tất cả',
+  avatar: '👥',
+  isGroup: true,
+};
 export default function PhotoPreviewScreen() {
   const router = useRouter();
   const { photoUri } = useLocalSearchParams();
   const { user, token } = useAuth();
   const [selectedRecipients, setSelectedRecipients] = useState(['all']);
+  const [friendRecipients, setFriendRecipients] = useState<RecipientEntry[]>([]);
+  const [isLoadingFriends, setIsLoadingFriends] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [visibility] = useState<PostVisibility>('friends');
   const [isSending, setIsSending] = useState(false);
@@ -40,15 +58,42 @@ export default function PhotoPreviewScreen() {
   }, [photoUri]);
 
 
+  const recipients = useMemo(() => {
+    return [GROUP_RECIPIENT, ...friendRecipients];
+  }, [friendRecipients]);
 
+  useEffect(() => {
+    let isMounted = true;
 
+    const fetchFriends = async () => {
+      setIsLoadingFriends(true);
+      try {
+        const response = await getFriendsApi();
+        const friends = response.data?.friends ?? [];
+        if (!isMounted) {
+          return;
+        }
+        const mappedRecipients: RecipientEntry[] = friends.map(friend => ({
+          id: friend.friendshipId || friend.id,
+          name: friend.displayName || friend.username,
+          avatarUrl: friend.avatarUrl,
+        }));
+        setFriendRecipients(mappedRecipients);
+      } catch (error) {
+        console.warn('[PhotoPreview] Failed to load friends', error);
+      } finally {
+        if (isMounted) {
+          setIsLoadingFriends(false);
+        }
+      }
+    };
 
-  const recipients = [
-    { id: 'all', name: 'Tất cả', avatar: '👥', isGroup: true },
-    { id: 'be', name: 'be', avatar: '👤' },
-    { id: 'mynh', name: 'MyNh...', avatar: '👤' },
-    { id: 'tn', name: 'TN', avatar: '👤' },
-  ];
+    fetchFriends();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const toggleRecipient = (id: string) => {
     if (id === 'all') {
@@ -249,8 +294,12 @@ export default function PhotoPreviewScreen() {
               ]}>
                 {recipient.isGroup ? (
                   <Ionicons name="people" size={20} color="#fff" />
+                ) : recipient.avatarUrl ? (
+                  <Image source={{ uri: recipient.avatarUrl }} style={styles.recipientImage} />
                 ) : (
-                  <Text style={styles.avatarText}>{recipient.avatar}</Text>
+                  <Text style={styles.avatarText}>
+                    {recipient.avatar || recipient.name.charAt(0).toUpperCase()}
+                  </Text>
                 )}
               </View>
               <Text style={[
@@ -261,6 +310,18 @@ export default function PhotoPreviewScreen() {
               </Text>
             </TouchableOpacity>
           ))}
+          {isLoadingFriends && (
+            <View style={styles.loadingRecipients}>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.loadingText}>Đang tải bạn bè...</Text>
+            </View>
+          )}
+          {!isLoadingFriends && friendRecipients.length === 0 && (
+            <View style={styles.loadingRecipients}>
+              <Ionicons name="information-circle" size={18} color="#fff" />
+              <Text style={styles.loadingText}>Chưa có bạn bè nào</Text>
+            </View>
+          )}
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -408,5 +469,20 @@ const styles = StyleSheet.create({
   },
   selectedRecipient: {
     // Additional styling for selected state
+  },
+  recipientImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  loadingRecipients: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  loadingText: {
+    color: '#aaa',
+    marginLeft: 6,
+    fontSize: 12,
   },
 });

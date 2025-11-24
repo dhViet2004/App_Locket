@@ -13,6 +13,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useAuth } from "../src/context/AuthContext";
 import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
+import { getFriendsApi } from "../src/api/services/friendship.service";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -24,6 +25,7 @@ export default function HomeScreen() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [showFriendsModal, setShowFriendsModal] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [friendCount, setFriendCount] = useState(0);
   const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
@@ -36,6 +38,28 @@ export default function HomeScreen() {
       shouldDuckAndroid: false,
       playThroughEarpieceAndroid: false,
     }).catch((error: unknown) => console.warn('Failed to set audio mode', error));
+  }, []);
+  
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchFriendCount = async () => {
+      try {
+        const response = await getFriendsApi();
+        const nextCount = response.data?.count ?? response.data?.friends?.length ?? 0;
+        if (isMounted) {
+          setFriendCount(nextCount);
+        }
+      } catch (error) {
+        console.warn('[Home] Failed to fetch friend count', error);
+      }
+    };
+
+    fetchFriendCount();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
   
   // Hide debug text in development
@@ -212,6 +236,9 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.friendsButton} onPress={openFriendsModal}>
             <FontAwesome5 name="user-friends" size={14} color="white" />
             <Text style={styles.friendsText}> Bạn bè</Text>
+            <View style={styles.friendCountBadge}>
+              <Text style={styles.friendCountText}>{friendCount}</Text>
+            </View>
           </TouchableOpacity>
 
           {/* Chat Icon */}
@@ -461,6 +488,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '500',
+  },
+  friendCountBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    backgroundColor: '#FF8C00',
+  },
+  friendCountText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '700',
   },
   chatIcon: {
     width: 40,

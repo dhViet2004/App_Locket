@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,18 +13,23 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../src/context/AuthContext";
+import { getFriendsApi } from "../src/api/services/friendship.service";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function HistoryScreen() {
   const router = useRouter();
   const { newPhoto } = useLocalSearchParams();
+  const { user } = useAuth();
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Smileys & People');
   const [searchQuery, setSearchQuery] = useState('');
+  const [friendCount, setFriendCount] = useState(0);
   
   // Grid view states
   const [viewMode, setViewMode] = useState<'fullscreen' | 'grid'>('fullscreen');
@@ -80,6 +85,28 @@ export default function HistoryScreen() {
   };
 
   const historyData = getHistoryData();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchFriendCount = async () => {
+      try {
+        const response = await getFriendsApi();
+        const nextCount = response.data?.count ?? response.data?.friends?.length ?? 0;
+        if (isMounted) {
+          setFriendCount(nextCount);
+        }
+      } catch (error) {
+        console.warn('[History] Failed to fetch friend count', error);
+      }
+    };
+
+    fetchFriendCount();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Emoji categories for the picker
   const emojiCategories = {
@@ -187,16 +214,27 @@ export default function HistoryScreen() {
             /* Full Screen Header */
             <>
               <TouchableOpacity onPress={handleProfile} style={styles.headerButton}>
-                <Ionicons name="person-outline" size={24} color="#fff" />
+                <View style={styles.profileIcon}>
+                  {user?.avatarUrl ? (
+                    <Image source={{ uri: user.avatarUrl }} style={styles.profileAvatarLarge} />
+                  ) : (
+                    <FontAwesome5 name="user-circle" size={24} color="#fff" />
+                  )}
+                </View>
               </TouchableOpacity>
               
               <TouchableOpacity onPress={handleFriends} style={styles.friendsButton}>
-                <Ionicons name="people-outline" size={20} color="#fff" />
-                <Text style={styles.friendsText}>3 Bạn bè</Text>
+                <FontAwesome5 name="user-friends" size={14} color="#fff" />
+                <Text style={styles.friendsText}> Bạn bè</Text>
+                <View style={styles.friendCountBadge}>
+                  <Text style={styles.friendCountText}>{friendCount}</Text>
+                </View>
               </TouchableOpacity>
               
               <TouchableOpacity onPress={handleChat} style={styles.headerButton}>
-                <Ionicons name="chatbubble-outline" size={24} color="#fff" />
+                <View style={styles.chatIcon}>
+                  <Ionicons name="chatbubble-outline" size={24} color="#fff" />
+                </View>
               </TouchableOpacity>
             </>
           ) : (
@@ -529,19 +567,52 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  profileIcon: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#333333',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  profileAvatarLarge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
   friendsButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111',
-    paddingHorizontal: 12,
+    backgroundColor: '#333333',
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
   },
   friendsText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  friendCountBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    backgroundColor: '#FF8C00',
+  },
+  friendCountText: {
+    color: '#000000',
     fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 6,
+    fontWeight: '700',
+  },
+  chatIcon: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#333333',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,
