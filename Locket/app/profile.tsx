@@ -19,7 +19,7 @@ import { useRouter, Stack, useFocusEffect, usePathname, useSegments } from 'expo
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../src/context/AuthContext";
 import * as ImagePicker from 'expo-image-picker';
-import { changeEmailApi, updateAvatarApi } from "../src/api/services/user.service";
+import { changeEmailApi, changePasswordApi, updateAvatarApi } from "../src/api/services/user.service";
 import { isAxiosError } from 'axios';
 
 export default function ProfileScreen() {
@@ -35,6 +35,16 @@ export default function ProfileScreen() {
   const [changeEmailValue, setChangeEmailValue] = useState('');
   const [changeEmailError, setChangeEmailError] = useState<string | null>(null);
   const [changingEmail, setChangingEmail] = useState(false);
+  const [changePasswordModalVisible, setChangePasswordModalVisible] = useState(false);
+  const [currentPasswordValue, setCurrentPasswordValue] = useState('');
+  const [newPasswordValue, setNewPasswordValue] = useState('');
+  const [confirmPasswordValue, setConfirmPasswordValue] = useState('');
+  const [changePasswordError, setChangePasswordError] = useState<string | null>(null);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showChangeEmailPassword, setShowChangeEmailPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const SHOULD_REFRESH_USER = false; // Temporary flag to stop calling refreshUser API
   
   // Refs để tránh gọi refreshUser() quá nhiều lần
@@ -312,7 +322,76 @@ export default function ProfileScreen() {
     setChangeEmailPassword('');
     setChangeEmailValue(user?.email ?? '');
     setChangeEmailError(null);
+    setShowChangeEmailPassword(false);
     setChangeEmailModalVisible(true);
+  };
+
+  const handleChangePassword = () => {
+    setCurrentPasswordValue('');
+    setNewPasswordValue('');
+    setConfirmPasswordValue('');
+    setChangePasswordError(null);
+    setShowCurrentPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setChangePasswordModalVisible(true);
+  };
+
+  const closeChangePasswordModal = () => {
+    setChangePasswordModalVisible(false);
+    setCurrentPasswordValue('');
+    setNewPasswordValue('');
+    setConfirmPasswordValue('');
+    setChangePasswordError(null);
+    setShowCurrentPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+  };
+
+  const handleSubmitChangePassword = async () => {
+    const trimmedCurrent = currentPasswordValue.trim();
+    const trimmedNew = newPasswordValue.trim();
+    const trimmedConfirm = confirmPasswordValue.trim();
+
+    if (!trimmedCurrent || !trimmedNew || !trimmedConfirm) {
+      setChangePasswordError('Vui lòng nhập đủ tất cả các trường.');
+      return;
+    }
+
+    if (trimmedNew.length < 8) {
+      setChangePasswordError('Mật khẩu mới phải có ít nhất 8 ký tự.');
+      return;
+    }
+
+    if (trimmedNew !== trimmedConfirm) {
+      setChangePasswordError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    if (trimmedNew === trimmedCurrent) {
+      setChangePasswordError('Mật khẩu mới phải khác mật khẩu hiện tại.');
+      return;
+    }
+
+    setChangingPassword(true);
+    setChangePasswordError(null);
+
+    try {
+      await changePasswordApi({
+        currentPassword: trimmedCurrent,
+        newPassword: trimmedNew,
+      });
+      Alert.alert('Thành công', 'Đã cập nhật mật khẩu.');
+      closeChangePasswordModal();
+    } catch (error) {
+      let message = 'Không thể đổi mật khẩu. Vui lòng thử lại.';
+      if (isAxiosError(error)) {
+        message = (error.response?.data as { message?: string })?.message || message;
+      }
+      setChangePasswordError(message);
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   const closeChangeEmailModal = () => {
@@ -320,6 +399,7 @@ export default function ProfileScreen() {
     setChangeEmailPassword('');
     setChangeEmailValue('');
     setChangeEmailError(null);
+    setShowChangeEmailPassword(false);
   };
 
   const handleSubmitChangeEmail = async () => {
@@ -579,6 +659,7 @@ export default function ProfileScreen() {
           <View style={styles.settingsList}>
             {renderSettingItem('person-outline', 'Sửa tên', userDisplayName, handleEditName)}
             {renderSettingItem('mail-outline', 'Thay đổi địa chỉ email', userEmail, handleChangeEmail)}
+            {renderSettingItem('lock-closed-outline', 'Thay đổi mật khẩu', undefined, handleChangePassword)}
           </View>
         ))}
 
@@ -675,15 +756,28 @@ export default function ProfileScreen() {
               editable={!changingEmail}
             />
             <Text style={styles.inputLabel}>Mật khẩu hiện tại</Text>
-            <TextInput
-              value={changeEmailPassword}
-              onChangeText={setChangeEmailPassword}
-              placeholder="Nhập mật khẩu"
-              secureTextEntry
-              style={styles.modalInput}
-              placeholderTextColor="#666"
-              editable={!changingEmail}
-            />
+            <View style={styles.modalInputWrapper}>
+              <TextInput
+                value={changeEmailPassword}
+                onChangeText={setChangeEmailPassword}
+                placeholder="Nhập mật khẩu"
+                secureTextEntry={!showChangeEmailPassword}
+                style={styles.modalInput}
+                placeholderTextColor="#666"
+                editable={!changingEmail}
+              />
+              <TouchableOpacity
+                style={styles.modalEyeButton}
+                onPress={() => setShowChangeEmailPassword((prev) => !prev)}
+                disabled={changingEmail}
+              >
+                <Ionicons
+                  name={showChangeEmailPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={20}
+                  color={changingEmail ? '#555' : '#999'}
+                />
+              </TouchableOpacity>
+            </View>
             {changeEmailError ? (
               <Text style={styles.modalErrorText}>{changeEmailError}</Text>
             ) : null}
@@ -701,6 +795,110 @@ export default function ProfileScreen() {
                 disabled={changingEmail}
               >
                 {changingEmail ? (
+                  <ActivityIndicator color="#000" />
+                ) : (
+                  <Text style={[styles.modalButtonText, styles.modalPrimaryButtonText]}>Lưu</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={changePasswordModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={closeChangePasswordModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Thay đổi mật khẩu</Text>
+            <Text style={styles.inputLabel}>Mật khẩu hiện tại</Text>
+            <View style={styles.modalInputWrapper}>
+              <TextInput
+                value={currentPasswordValue}
+                onChangeText={setCurrentPasswordValue}
+                placeholder="Nhập mật khẩu hiện tại"
+                secureTextEntry={!showCurrentPassword}
+                style={styles.modalInput}
+                placeholderTextColor="#666"
+                editable={!changingPassword}
+              />
+              <TouchableOpacity
+                style={styles.modalEyeButton}
+                onPress={() => setShowCurrentPassword((prev) => !prev)}
+                disabled={changingPassword}
+              >
+                <Ionicons
+                  name={showCurrentPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={20}
+                  color={changingPassword ? '#555' : '#999'}
+                />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.inputLabel}>Mật khẩu mới</Text>
+            <View style={styles.modalInputWrapper}>
+              <TextInput
+                value={newPasswordValue}
+                onChangeText={setNewPasswordValue}
+                placeholder="Nhập mật khẩu mới"
+                secureTextEntry={!showNewPassword}
+                style={styles.modalInput}
+                placeholderTextColor="#666"
+                editable={!changingPassword}
+              />
+              <TouchableOpacity
+                style={styles.modalEyeButton}
+                onPress={() => setShowNewPassword((prev) => !prev)}
+                disabled={changingPassword}
+              >
+                <Ionicons
+                  name={showNewPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={20}
+                  color={changingPassword ? '#555' : '#999'}
+                />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.inputLabel}>Xác nhận mật khẩu mới</Text>
+            <View style={styles.modalInputWrapper}>
+              <TextInput
+                value={confirmPasswordValue}
+                onChangeText={setConfirmPasswordValue}
+                placeholder="Nhập lại mật khẩu mới"
+                secureTextEntry={!showConfirmPassword}
+                style={styles.modalInput}
+                placeholderTextColor="#666"
+                editable={!changingPassword}
+              />
+              <TouchableOpacity
+                style={styles.modalEyeButton}
+                onPress={() => setShowConfirmPassword((prev) => !prev)}
+                disabled={changingPassword}
+              >
+                <Ionicons
+                  name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={20}
+                  color={changingPassword ? '#555' : '#999'}
+                />
+              </TouchableOpacity>
+            </View>
+            {changePasswordError ? (
+              <Text style={styles.modalErrorText}>{changePasswordError}</Text>
+            ) : null}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={closeChangePasswordModal}
+                disabled={changingPassword}
+              >
+                <Text style={styles.modalButtonText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalPrimaryButton, changingPassword && styles.modalButtonDisabled]}
+                onPress={handleSubmitChangePassword}
+                disabled={changingPassword}
+              >
+                {changingPassword ? (
                   <ActivityIndicator color="#000" />
                 ) : (
                   <Text style={[styles.modalButtonText, styles.modalPrimaryButtonText]}>Lưu</Text>
@@ -932,7 +1130,20 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    paddingRight: 44,
     color: '#fff',
+  },
+  modalInputWrapper: {
+    position: 'relative',
+  },
+  modalEyeButton: {
+    position: 'absolute',
+    right: 10,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
   },
   modalErrorText: {
     color: '#ff6b6b',

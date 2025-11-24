@@ -1,5 +1,5 @@
 import { apiGet, apiPatchForm, apiPost } from '../client';
-import type { AuthUser, ChangeEmailRequest } from '../../types/api.types';
+import type { AuthUser, ChangeEmailRequest, ChangePasswordRequest } from '../../types/api.types';
 
 export async function getUserProfileApi() {
   return apiGet<AuthUser>('/users/me');
@@ -11,5 +11,9 @@ export async function updateAvatarApi(formData: FormData) {
 
 export async function changeEmailApi(payload: ChangeEmailRequest) {
   return apiPost<AuthUser, ChangeEmailRequest>('/users/change-email', payload);
+}
+
+export async function changePasswordApi(payload: ChangePasswordRequest) {
+  return apiPost<AuthUser, ChangePasswordRequest>('/users/change-password', payload);
 }
 

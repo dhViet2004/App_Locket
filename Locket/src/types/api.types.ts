@@ -67,6 +67,11 @@ export interface ChangeEmailRequest {
   newEmail: string;
 }
 
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface CheckEmailResponse {
   available: boolean;
 }
