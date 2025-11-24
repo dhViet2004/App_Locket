@@ -17,7 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack, useFocusEffect, usePathname, useSegments } from 'expo-router';
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "../src/context/AuthContext";
+import { useAuth, DEFAULT_AVATAR_URL } from "../src/context/AuthContext";
 import * as ImagePicker from 'expo-image-picker';
 import { changeEmailApi, changePasswordApi, updateAvatarApi } from "../src/api/services/user.service";
 import { isAxiosError } from 'axios';
@@ -615,7 +615,7 @@ export default function ProfileScreen() {
             ) : (
               <Image
                 source={{ 
-                  uri: user?.avatarUrl || 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761231281/taskmanagement/avatars/a0hsc7oncibdgnvhbgbp.jpg' 
+                  uri: user?.avatarUrl || DEFAULT_AVATAR_URL 
                 }}
                 style={styles.avatar}
               />

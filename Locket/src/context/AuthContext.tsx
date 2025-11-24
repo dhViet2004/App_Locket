@@ -19,7 +19,7 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const DEFAULT_AVATAR_URL =
+export const DEFAULT_AVATAR_URL =
   'https://res.cloudinary.com/dh1o42tjk/image/upload/v1763984160/user_htt7q6.jpg';
 
 function withDefaultAvatar(user: AuthUser | null): AuthUser | null {
