@@ -325,7 +325,7 @@ export default function HomeScreen() {
               {/* Header */}
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Bạn bè của bạn</Text>
-                <Text style={styles.modalSubtitle}>0 / 20 người bạn đã được bổ sung</Text>
+                <Text style={styles.modalSubtitle}>{friendCount} / 20 người bạn đã được bổ sung</Text>
               </View>
 
               {/* Search Bar */}
