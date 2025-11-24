@@ -80,4 +80,21 @@ export interface CheckUsernameResponse {
   available: boolean;
 }
 
+export type PostVisibility = 'friends' | 'private';
+
+export interface Post {
+  _id: string;
+  author: string | AuthUser;
+  imageUrl: string;
+  caption?: string;
+  visibility: PostVisibility;
+  reactionCount: number;
+  commentCount: number;
+  reactionCounts: Record<string, number>;
+  viewers: string[];
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 

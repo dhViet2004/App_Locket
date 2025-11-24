@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,17 +9,34 @@ import {
   TextInput,
   StatusBar,
   Dimensions,
+  Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from "react-native-safe-area-context";
+import { isAxiosError } from 'axios';
+import { useAuth, DEFAULT_AVATAR_URL } from "../src/context/AuthContext";
+import { buildCreatePostFormData, createPostApi } from "../src/api/services/post.service";
+import type { PostVisibility } from "../src/types/api.types";
 
 const { width: screenWidth } = Dimensions.get('window');
 export default function PhotoPreviewScreen() {
   const router = useRouter();
   const { photoUri } = useLocalSearchParams();
+  const { user, token } = useAuth();
   const [selectedRecipients, setSelectedRecipients] = useState(['all']);
   const [messageText, setMessageText] = useState('');
+  const [visibility] = useState<PostVisibility>('friends');
+  const [isSending, setIsSending] = useState(false);
+
+  const resolvedPhotoUri = useMemo(() => {
+    if (Array.isArray(photoUri)) {
+      return photoUri[0];
+    }
+    return photoUri;
+  }, [photoUri]);
 
 
 
@@ -47,39 +64,84 @@ export default function PhotoPreviewScreen() {
     }
   };
 
-  const handleSend = () => {
-    // Logic gửi ảnh
-    console.log('Gửi ảnh:', photoUri);
-    console.log('Tin nhắn:', messageText);
-    console.log('Người nhận:', selectedRecipients);
-    
-    // Tạo object ảnh mới để thêm vào history
-    const newPhoto = {
-      id: Date.now().toString(), // ID duy nhất
-      image: photoUri as string,
-      message: messageText || '',
-      sender: {
-        name: 'Bạn', // Tên người gửi (có thể lấy từ user data)
-        avatar: 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761231281/taskmanagement/avatars/a0hsc7oncibdgnvhbgbp.jpg', // Avatar của bạn
-        time: 'Vừa xong'
-      },
-      recipients: selectedRecipients,
-      timestamp: new Date().toISOString()
-    };
-    
-    // Lưu ảnh vào AsyncStorage hoặc state management
-    // Ở đây chúng ta sẽ sử dụng router để chuyển hướng và truyền data
-    router.push({
-      pathname: '/history',
-      params: {
-        newPhoto: JSON.stringify(newPhoto)
+  const handleSend = async () => {
+    if (isSending) {
+      return;
+    }
+
+    if (!token) {
+      Alert.alert('Chưa đăng nhập', 'Vui lòng đăng nhập để tiếp tục.');
+      router.push('/login');
+      return;
+    }
+
+    if (!resolvedPhotoUri) {
+      Alert.alert('Thiếu ảnh', 'Không tìm thấy ảnh để gửi. Vui lòng chụp lại.');
+      router.back();
+      return;
+    }
+
+    try {
+      setIsSending(true);
+
+      const normalizedUri =
+        Platform.OS === 'ios' ? resolvedPhotoUri.replace('file://', '') : resolvedPhotoUri;
+      const filename = resolvedPhotoUri.split('/').pop() ?? `photo-${Date.now()}.jpg`;
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      const formData = buildCreatePostFormData(
+        {
+          uri: normalizedUri,
+          name: filename,
+          type,
+        },
+        {
+          caption: messageText.trim() || undefined,
+          visibility,
+        }
+      );
+
+      const response = await createPostApi(formData);
+      const createdPost = response.data;
+
+      const newPhoto = {
+        id: createdPost._id,
+        image: createdPost.imageUrl,
+        message: createdPost.caption || '',
+        sender: {
+          name: user?.displayName || user?.username || 'Bạn',
+          avatar: user?.avatarUrl || DEFAULT_AVATAR_URL,
+          time: 'Vừa xong',
+        },
+        recipients: selectedRecipients,
+        timestamp: createdPost.createdAt,
+      };
+
+      router.push({
+        pathname: '/history',
+        params: {
+          newPhoto: JSON.stringify(newPhoto),
+        },
+      });
+    } catch (error) {
+      console.error('Error creating post:', error);
+      let message = 'Không thể gửi ảnh. Vui lòng thử lại.';
+      if (isAxiosError(error)) {
+        message = (error.response?.data as { message?: string })?.message || message;
       }
-    });
+      Alert.alert('Lỗi', message);
+    } finally {
+      setIsSending(false);
+    }
   };
 
 
   const handleCancel = () => {
     // Logic hủy và quay lại
+    if (isSending) {
+      return;
+    }
     router.back();
   };
 
@@ -101,7 +163,7 @@ export default function PhotoPreviewScreen() {
         {/* Photo Container - matching camera size from home */}
         <View style={styles.photoContainer}>
           <Image
-            source={{ uri: photoUri as string || 'https://via.placeholder.com/300x400/333/fff?text=Photo+Preview' }}
+            source={{ uri: resolvedPhotoUri as string || 'https://via.placeholder.com/300x400/333/fff?text=Photo+Preview' }}
             style={styles.photo}
             resizeMode="cover"
           />
@@ -127,15 +189,23 @@ export default function PhotoPreviewScreen() {
 
         {/* Control Buttons */}
         <View style={styles.controlButtons}>
-          <TouchableOpacity style={styles.controlButton} onPress={handleCancel}>
+          <TouchableOpacity style={styles.controlButton} onPress={handleCancel} disabled={isSending}>
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-            <Ionicons name="paper-plane" size={28} color="#fff" />
+          <TouchableOpacity
+            style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
+            onPress={handleSend}
+            disabled={isSending}
+          >
+            {isSending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Ionicons name="paper-plane" size={28} color="#fff" />
+            )}
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.controlButton} onPress={handleAddText}>
+          <TouchableOpacity style={styles.controlButton} onPress={handleAddText} disabled={isSending}>
             <Text style={styles.textIcon}>Aa</Text>
           </TouchableOpacity>
         </View>
@@ -273,6 +343,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 20,
+  },
+  sendButtonDisabled: {
+    opacity: 0.7,
   },
   textIcon: {
     color: '#fff',

@@ -23,9 +23,14 @@ export async function apiPost<T, B = unknown>(url: string, body?: B) {
   return res.data;
 }
 
-export async function apiPostForm<T>(url: string, form: FormData) {
+export async function apiPostForm<T>(
+  url: string,
+  form: FormData,
+  config?: { timeout?: number },
+) {
   const res = await apiClient.post<ApiResponse<T>>(url, form, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: config?.timeout ?? 60000,
   });
   return res.data;
 }
