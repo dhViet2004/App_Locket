@@ -62,6 +62,11 @@ export interface ResetPasswordResponse {
   message: string;
 }
 
+export interface ChangeEmailRequest {
+  password: string;
+  newEmail: string;
+}
+
 export interface CheckEmailResponse {
   available: boolean;
 }

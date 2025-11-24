@@ -11,13 +11,15 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack, useFocusEffect, usePathname, useSegments } from 'expo-router';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../src/context/AuthContext";
 import * as ImagePicker from 'expo-image-picker';
-import { updateAvatarApi } from "../src/api/services/user.service";
+import { changeEmailApi, updateAvatarApi } from "../src/api/services/user.service";
 import { isAxiosError } from 'axios';
 
 export default function ProfileScreen() {
@@ -28,6 +30,11 @@ export default function ProfileScreen() {
   const [widgetChainEnabled, setWidgetChainEnabled] = useState(true);
   const [showAccount, setShowAccount] = useState(true);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [changeEmailModalVisible, setChangeEmailModalVisible] = useState(false);
+  const [changeEmailPassword, setChangeEmailPassword] = useState('');
+  const [changeEmailValue, setChangeEmailValue] = useState('');
+  const [changeEmailError, setChangeEmailError] = useState<string | null>(null);
+  const [changingEmail, setChangingEmail] = useState(false);
   const SHOULD_REFRESH_USER = false; // Temporary flag to stop calling refreshUser API
   
   // Refs để tránh gọi refreshUser() quá nhiều lần
@@ -302,8 +309,56 @@ export default function ProfileScreen() {
   };
 
   const handleChangeEmail = () => {
-    // Logic thay đổi email
-    console.log('Change email');
+    setChangeEmailPassword('');
+    setChangeEmailValue(user?.email ?? '');
+    setChangeEmailError(null);
+    setChangeEmailModalVisible(true);
+  };
+
+  const closeChangeEmailModal = () => {
+    setChangeEmailModalVisible(false);
+    setChangeEmailPassword('');
+    setChangeEmailValue('');
+    setChangeEmailError(null);
+  };
+
+  const handleSubmitChangeEmail = async () => {
+    const trimmedPassword = changeEmailPassword.trim();
+    const trimmedEmail = changeEmailValue.trim();
+
+    if (!trimmedPassword || !trimmedEmail) {
+      setChangeEmailError('Vui lòng nhập đầy đủ mật khẩu và email mới.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setChangeEmailError('Email không hợp lệ.');
+      return;
+    }
+
+    setChangingEmail(true);
+    setChangeEmailError(null);
+
+    try {
+      const response = await changeEmailApi({
+        password: trimmedPassword,
+        newEmail: trimmedEmail,
+      });
+      if (response.data) {
+        updateUser(response.data);
+      }
+      Alert.alert('Thành công', 'Đã cập nhật email.');
+      closeChangeEmailModal();
+    } catch (error) {
+      let message = 'Không thể đổi email. Vui lòng thử lại.';
+      if (isAxiosError(error)) {
+        message = (error.response?.data as { message?: string })?.message || message;
+      }
+      setChangeEmailError(message);
+    } finally {
+      setChangingEmail(false);
+    }
   };
 
   const handleBlockedAccounts = () => {
@@ -599,6 +654,62 @@ export default function ProfileScreen() {
         {/* Bottom Spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
+      <Modal
+        visible={changeEmailModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={closeChangeEmailModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Thay đổi email</Text>
+            <Text style={styles.inputLabel}>Email mới</Text>
+            <TextInput
+              value={changeEmailValue}
+              onChangeText={setChangeEmailValue}
+              placeholder="nhap.email@moi.com"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              style={styles.modalInput}
+              placeholderTextColor="#666"
+              editable={!changingEmail}
+            />
+            <Text style={styles.inputLabel}>Mật khẩu hiện tại</Text>
+            <TextInput
+              value={changeEmailPassword}
+              onChangeText={setChangeEmailPassword}
+              placeholder="Nhập mật khẩu"
+              secureTextEntry
+              style={styles.modalInput}
+              placeholderTextColor="#666"
+              editable={!changingEmail}
+            />
+            {changeEmailError ? (
+              <Text style={styles.modalErrorText}>{changeEmailError}</Text>
+            ) : null}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={closeChangeEmailModal}
+                disabled={changingEmail}
+              >
+                <Text style={styles.modalButtonText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalPrimaryButton, changingEmail && styles.modalButtonDisabled]}
+                onPress={handleSubmitChangeEmail}
+                disabled={changingEmail}
+              >
+                {changingEmail ? (
+                  <ActivityIndicator color="#000" />
+                ) : (
+                  <Text style={[styles.modalButtonText, styles.modalPrimaryButtonText]}>Lưu</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       </SafeAreaView>
     </>
   );
@@ -785,5 +896,76 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 30,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: '#111',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: '#ccc',
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  modalInput: {
+    backgroundColor: '#000',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#fff',
+  },
+  modalErrorText: {
+    color: '#ff6b6b',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
+    marginHorizontal: 4,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  modalPrimaryButton: {
+    backgroundColor: '#ffd700',
+    borderColor: '#ffd700',
+  },
+  modalPrimaryButtonText: {
+    color: '#000',
+    fontWeight: '600',
+  },
+  modalButtonDisabled: {
+    opacity: 0.6,
   },
 });
