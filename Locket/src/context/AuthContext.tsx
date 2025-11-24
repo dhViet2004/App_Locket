@@ -19,6 +19,23 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const DEFAULT_AVATAR_URL =
+  'https://res.cloudinary.com/dh1o42tjk/image/upload/v1763984160/user_htt7q6.jpg';
+
+function withDefaultAvatar(user: AuthUser | null): AuthUser | null {
+  if (!user) {
+    return null;
+  }
+
+  if (user.avatarUrl) {
+    return user;
+  }
+
+  return {
+    ...user,
+    avatarUrl: DEFAULT_AVATAR_URL,
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -34,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setAuthState = useCallback((payload: AuthResponse) => {
-    setUser(payload.user);
+    setUser(withDefaultAvatar(payload.user));
     setToken(payload.token);
   }, []);
 
@@ -60,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         apiClient.defaults.headers.common.Authorization = `Bearer ${response.data.token}`;
         try {
           const userResponse = await getUserProfileApi();
-          setUser(userResponse.data);
+          setUser(withDefaultAvatar(userResponse.data));
         } catch (refreshErr) {
           console.error('Error refreshing user after login:', refreshErr);
           // Nếu refresh fail, vẫn dùng data từ login response
@@ -89,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateUser = useCallback((updatedUser: AuthUser) => {
-    setUser(updatedUser);
+    setUser(withDefaultAvatar(updatedUser));
   }, []);
 
   const refreshUser = useCallback(async () => {
@@ -121,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           username: response.data?.username,
           email: response.data?.email,
         });
-        setUser(response.data);
+        setUser(withDefaultAvatar(response.data));
         console.log('[AuthContext] User state updated');
       } catch (err) {
         console.error('[AuthContext] ❌ Error refreshing user:', err);

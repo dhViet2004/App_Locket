@@ -28,6 +28,7 @@ export default function ProfileScreen() {
   const [widgetChainEnabled, setWidgetChainEnabled] = useState(true);
   const [showAccount, setShowAccount] = useState(true);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const SHOULD_REFRESH_USER = false; // Temporary flag to stop calling refreshUser API
   
   // Refs để tránh gọi refreshUser() quá nhiều lần
   const isRefreshingRef = React.useRef(false);
@@ -101,6 +102,11 @@ export default function ProfileScreen() {
   // QUAN TRỌNG: Đảm bảo profile screen được focus và không bị redirect
   useFocusEffect(
     React.useCallback(() => {
+      if (!SHOULD_REFRESH_USER) {
+        console.log('[Profile] refreshUser() temporarily disabled');
+        return;
+      }
+
       // Đánh dấu là đã mount
       focusEffectMountedRef.current = true;
       
