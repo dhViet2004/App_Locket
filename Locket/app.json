@@ -12,7 +12,9 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Cho phép Locket truy cập thư viện ảnh để lưu ảnh.",
-        "NSPhotoLibraryAddUsageDescription": "Cho phép Locket lưu ảnh vào thư viện."
+        "NSPhotoLibraryAddUsageDescription": "Cho phép Locket lưu ảnh vào thư viện.",
+        "NSCameraUsageDescription": "Cho phép Locket sử dụng camera để chụp ảnh khoảnh khắc.",
+        "NSMicrophoneUsageDescription": "Cho phép Locket sử dụng micro khi quay video."
       }
     },
     "android": {

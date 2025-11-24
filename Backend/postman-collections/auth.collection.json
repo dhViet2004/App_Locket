@@ -325,6 +325,69 @@
       }
     },
     {
+      "name": "Reset Password",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has success field', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('success');",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "});",
+              "",
+              "pm.test('Response has message field', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('message');",
+              "    pm.expect(jsonData.message).to.include('Password reset successfully');",
+              "});",
+              "",
+              "pm.test('Response has data field', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('data');",
+              "});",
+              "",
+              "// Log success message",
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    console.log('Password reset successfully:', jsonData.message);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"identifier\": \"user@example.com\",\n  \"code\": \"123456\",\n  \"newPassword\": \"newpassword123\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/reset-password",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "reset-password"
+          ]
+        },
+        "description": "Đặt lại mật khẩu sau khi đã verify OTP thành công.\n\n**Flow:**\n1. Gọi `Send OTP` để nhận mã OTP\n2. Gọi `Verify OTP` để xác thực mã OTP\n3. Gọi `Reset Password` để đặt lại mật khẩu mới\n\n**Body:**\n```json\n{\n  \"identifier\": \"user@example.com\" hoặc \"+84901234567\",\n  \"code\": \"123456\",\n  \"newPassword\": \"newpassword123\"\n}\n```\n\n**Yêu cầu:**\n- `identifier`: Email hoặc số điện thoại (phải giống với lúc gửi OTP)\n- `code`: Mã OTP 6 chữ số (phải đúng và chưa hết hạn)\n- `newPassword`: Mật khẩu mới (tối thiểu 6 ký tự)\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Password reset successfully\",\n  \"data\": {\n    \"userId\": \"...\",\n    \"identifier\": \"user@example.com\"\n  }\n}\n```\n\n**Lỗi có thể gặp:**\n- `400`: Thiếu thông tin hoặc mật khẩu quá ngắn (< 6 ký tự)\n- `400`: OTP không hợp lệ hoặc đã hết hạn\n- `404`: Không tìm thấy user với identifier này\n- `400`: OTP đã được sử dụng (mỗi OTP chỉ dùng được 1 lần)"
+      }
+    },
+    {
       "name": "Check Username Availability",
       "event": [
         {

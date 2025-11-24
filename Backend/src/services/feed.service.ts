@@ -179,6 +179,11 @@ export class FeedService {
     page: number = 1,
     limit: number = 20
   ): Promise<FeedItem[]> {
+    // Deprecated: Chuyển sang sử dụng getFeedWithCursor
+    // Tính cursor từ page (đơn giản hóa, không chính xác 100%)
+    const result = await this.getFeedWithCursor(userId, isPremium, limit);
+    return result.data;
+  }
 
   /**
    * Lấy danh sách quảng cáo đang hoạt động cho placement

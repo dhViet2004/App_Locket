@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import {
   sendRequest,
+  sendRequestByUsername,
   acceptRequest,
   rejectRequest,
   getFriendsList,
@@ -30,6 +31,27 @@ export const sendFriendRequest = asyncHandler(async (req: AuthRequest, res: Resp
   }
 
   const friendship = await sendRequest(req.userId, toUserId);
+
+  return res.status(201).json(ok(friendship, 'Friend request sent successfully'));
+});
+
+/**
+ * Gửi lời mời kết bạn bằng username
+ * POST /friendships/request-by-username
+ * Body: { username: string }
+ */
+export const sendFriendRequestByUsername = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.userId) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const { username } = req.body;
+
+  if (!username) {
+    throw new ApiError(400, 'username is required');
+  }
+
+  const friendship = await sendRequestByUsername(req.userId, username);
 
   return res.status(201).json(ok(friendship, 'Friend request sent successfully'));
 });
