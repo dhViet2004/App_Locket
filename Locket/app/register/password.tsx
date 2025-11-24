@@ -81,12 +81,12 @@ export default function PasswordScreen() {
             />
           </View>
 
-          {password && !isValidPassword(password) && (
+          {password.length > 0 && !isValidPassword(password) ? (
             <Text style={styles.errorText}>Mật khẩu phải có ít nhất 8 ký tự</Text>
-          )}
-          {password && confirmPassword && password !== confirmPassword && (
+          ) : null}
+          {password.length > 0 && confirmPassword.length > 0 && password !== confirmPassword ? (
             <Text style={styles.errorText}>Mật khẩu không khớp</Text>
-          )}
+          ) : null}
         </View>
 
         {/* Footer */}
