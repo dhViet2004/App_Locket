@@ -3,7 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { Stack, useRouter, Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, CameraType, FlashMode } from "expo-camera";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import * as ScreenOrientation from 'expo-screen-orientation';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
@@ -12,6 +12,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useAuth } from "../src/context/AuthContext";
+import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -24,6 +25,18 @@ export default function HomeScreen() {
   const [showFriendsModal, setShowFriendsModal] = useState(false);
   const [searchText, setSearchText] = useState('');
   const cameraRef = useRef<CameraView>(null);
+
+  useEffect(() => {
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      shouldDuckAndroid: false,
+      playThroughEarpieceAndroid: false,
+    }).catch((error: unknown) => console.warn('Failed to set audio mode', error));
+  }, []);
   
   // Hide debug text in development
   if (__DEV__) {

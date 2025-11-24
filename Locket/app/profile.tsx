@@ -21,6 +21,8 @@ import { useAuth } from "../src/context/AuthContext";
 import * as ImagePicker from 'expo-image-picker';
 import { changeEmailApi, changePasswordApi, updateAvatarApi } from "../src/api/services/user.service";
 import { isAxiosError } from 'axios';
+import { AddWidgetPromptModal } from '../src/components/AddWidgetPromptModal';
+import { useAddWidgetPrompt } from '../src/hooks/useAddWidgetPrompt';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -45,6 +47,13 @@ export default function ProfileScreen() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const {
+    openAddWidgetPrompt,
+    isPromptVisible: isAddWidgetPromptVisible,
+    closePrompt: closeAddWidgetPrompt,
+    confirmAddWidget,
+    isProcessing: isLaunchingWidgetPrompt,
+  } = useAddWidgetPrompt();
   const SHOULD_REFRESH_USER = false; // Temporary flag to stop calling refreshUser API
   
   // Refs để tránh gọi refreshUser() quá nhiều lần
@@ -311,6 +320,14 @@ export default function ProfileScreen() {
   const handleInviteFriends = () => {
     // Logic mời bạn bè
     console.log('Invite friends');
+  };
+
+  const handleAddWidget = () => {
+    openAddWidgetPrompt();
+  };
+
+  const handleHowToAddWidget = () => {
+    router.push('/register/tutorial?source=profile');
   };
 
   const handleEditName = () => {
@@ -637,8 +654,8 @@ export default function ProfileScreen() {
         {/* Widget Settings */}
         {renderSection('Thiết lập Tiện ích', (
           <View style={styles.settingsList}>
-            {renderSettingItem('add-outline', 'Thêm Tiện ích', undefined, handleEditProfile)}
-            {renderSettingItem('help-circle-outline', 'Cách thêm tiện ích', undefined, handleEditProfile)}
+            {renderSettingItem('add-outline', 'Thêm Tiện ích', undefined, handleAddWidget)}
+            {renderSettingItem('help-circle-outline', 'Cách thêm tiện ích', undefined, handleHowToAddWidget)}
             {renderSettingItem(
               'link-outline', 
               'Chuỗi trên tiện ích', 
@@ -735,6 +752,12 @@ export default function ProfileScreen() {
         {/* Bottom Spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
+      <AddWidgetPromptModal
+        visible={isAddWidgetPromptVisible}
+        onClose={closeAddWidgetPrompt}
+        onConfirm={confirmAddWidget}
+        loading={isLaunchingWidgetPrompt}
+      />
       <Modal
         visible={changeEmailModalVisible}
         animationType="slide"

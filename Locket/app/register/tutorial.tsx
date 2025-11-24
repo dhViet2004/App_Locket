@@ -1,6 +1,6 @@
 import { Text, View, StyleSheet, TouchableOpacity, Image, Dimensions, Modal } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { router, Stack } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useRef } from "react";
 import { ScrollView } from "react-native-gesture-handler";
@@ -38,6 +38,8 @@ export default function TutorialScreen() {
   const [currentStep, setCurrentStep] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const { source } = useLocalSearchParams<{ source?: string }>();
+  const isFromProfile = source === 'profile';
 
   const handleNext = () => {
     if (currentStep < tutorialSteps.length - 1) {
@@ -69,6 +71,10 @@ export default function TutorialScreen() {
 
   const handleModalContinue = () => {
     setShowModal(false);
+    if (isFromProfile) {
+      router.back();
+      return;
+    }
     router.push("/register/completion");
   };
 
