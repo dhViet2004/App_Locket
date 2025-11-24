@@ -11,6 +11,7 @@ export interface AuthUser {
   displayName?: string;
   email?: string;
   phone?: string;
+  avatarUrl?: string;
   roles: string[];
   createdAt: string;
   updatedAt: string;
@@ -59,6 +60,55 @@ export interface ResetPasswordRequest {
 
 export interface ResetPasswordResponse {
   message: string;
+}
+
+export interface ChangeEmailRequest {
+  password: string;
+  newEmail: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface CheckEmailResponse {
+  available: boolean;
+}
+
+export interface CheckUsernameResponse {
+  available: boolean;
+}
+
+export type PostVisibility = 'friends' | 'private';
+
+export interface Post {
+  _id: string;
+  author: string | AuthUser;
+  imageUrl: string;
+  caption?: string;
+  visibility: PostVisibility;
+  reactionCount: number;
+  commentCount: number;
+  reactionCounts: Record<string, number>;
+  viewers: string[];
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CaptionSuggestionResponse {
+  caption: string;
+}
+
+export interface FriendSummary extends AuthUser {
+  friendshipId: string;
+  acceptedAt: string;
+}
+
+export interface FriendsListResponse {
+  friends: FriendSummary[];
+  count: number;
 }
 
 

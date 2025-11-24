@@ -1,34 +1,71 @@
-import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, ScrollView } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, ScrollView, ActivityIndicator } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRegisterForm } from "../../src/context/RegisterContext";
+import { checkUsernameApi } from "../../src/api/services/auth.service";
 
 export default function UsernameScreen() {
   const { data, setUsername: persistUsername } = useRegisterForm();
   const [username, setUsername] = useState(data.username);
   const [isValidating, setIsValidating] = useState(false);
-  const [isAvailable, setIsAvailable] = useState(data.username.length >= 3);
+  const [isAvailable, setIsAvailable] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Simulate username validation
-  const validateUsername = async (username: string) => {
-    if (username.length < 3) return false;
+  // Check username availability with debounce
+  useEffect(() => {
+    const trimmedUsername = username.trim().toLowerCase();
     
-    setIsValidating(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsAvailable(true);
+    // Clear previous timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Reset states when username changes
+    setIsAvailable(false);
+    setUsernameError(null);
+
+    // Only check if username is valid length
+    if (!trimmedUsername || trimmedUsername.length < 3) {
       setIsValidating(false);
-    }, 1000);
-  };
+      return;
+    }
+
+    // Debounce: wait 500ms after user stops typing
+    setIsValidating(true);
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        const response = await checkUsernameApi(trimmedUsername);
+        if (response.data.available) {
+          setIsAvailable(true);
+          setUsernameError(null);
+        } else {
+          setIsAvailable(false);
+          setUsernameError("Tên người dùng này đã được sử dụng. Vui lòng chọn tên khác.");
+        }
+      } catch (error: any) {
+        // Handle API errors
+        setIsAvailable(false);
+        const errorMessage = error?.response?.data?.message || "Không thể kiểm tra tên người dùng. Vui lòng thử lại.";
+        setUsernameError(errorMessage);
+        console.error("Error checking username:", error);
+      } finally {
+        setIsValidating(false);
+      }
+    }, 500);
+
+    // Cleanup
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [username]);
 
   const handleUsernameChange = (text: string) => {
     setUsername(text);
-    setIsAvailable(false);
-    if (text.length >= 3) {
-      validateUsername(text);
-    }
   };
 
   const handleContinue = () => {
@@ -42,7 +79,7 @@ export default function UsernameScreen() {
     }
   };
 
-  const isFormValid = isAvailable && username.trim();
+  const isFormValid = isAvailable && username.trim() && !usernameError && !isValidating;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -74,35 +111,50 @@ export default function UsernameScreen() {
           <Text style={styles.title}>Thêm một tên người dùng</Text>
           
           <View style={styles.inputContainer}>
-            <TextInput
-              style={[styles.input, isAvailable && styles.inputValid]}
-              placeholder="Tên người dùng"
-              placeholderTextColor="#666666"
-              value={username}
-              onChangeText={handleUsernameChange}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoFocus
-            />
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={[
+                  styles.input,
+                  isAvailable && styles.inputValid,
+                  usernameError && styles.inputError
+                ]}
+                placeholder="Tên người dùng"
+                placeholderTextColor="#666666"
+                value={username}
+                onChangeText={handleUsernameChange}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus
+              />
+              {isValidating && (
+                <View style={styles.loadingIndicator}>
+                  <ActivityIndicator size="small" color="#FFD700" />
+                </View>
+              )}
+            </View>
+
+            {/* Status Feedback */}
+            {isValidating && (
+              <View style={styles.statusContainer}>
+                <Text style={styles.validatingText}>Đang kiểm tra...</Text>
+              </View>
+            )}
+            
+            {isAvailable && !isValidating && (
+              <View style={styles.statusContainer}>
+                <Text style={styles.heartIcon}>💛</Text>
+                <Text style={styles.availableText}>Có sẵn!</Text>
+              </View>
+            )}
+
+            {username.length > 0 && username.length < 3 && (
+              <Text style={styles.errorText}>Tên người dùng phải có ít nhất 3 ký tự</Text>
+            )}
+
+            {usernameError && (
+              <Text style={styles.errorText}>{usernameError}</Text>
+            )}
           </View>
-
-          {/* Status Feedback */}
-          {isValidating && (
-            <View style={styles.statusContainer}>
-              <Text style={styles.validatingText}>Đang kiểm tra...</Text>
-            </View>
-          )}
-          
-          {isAvailable && !isValidating && (
-            <View style={styles.statusContainer}>
-              <Text style={styles.heartIcon}>💛</Text>
-              <Text style={styles.availableText}>Có sẵn!</Text>
-            </View>
-          )}
-
-          {username.length > 0 && username.length < 3 && (
-            <Text style={styles.errorText}>Tên người dùng phải có ít nhất 3 ký tự</Text>
-          )}
         </View>
 
         {/* Footer */}
@@ -172,11 +224,15 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 20,
   },
+  inputWrapper: {
+    position: 'relative',
+  },
   input: {
     backgroundColor: '#1A1A1A',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 16,
+    paddingRight: 50,
     fontSize: 16,
     color: '#FFFFFF',
     borderWidth: 1,
@@ -184,6 +240,14 @@ const styles = StyleSheet.create({
   },
   inputValid: {
     borderColor: '#FFD700',
+  },
+  inputError: {
+    borderColor: '#FF4444',
+  },
+  loadingIndicator: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
   },
   statusContainer: {
     flexDirection: 'row',

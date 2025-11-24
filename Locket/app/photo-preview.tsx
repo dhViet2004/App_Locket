@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,28 +9,91 @@ import {
   TextInput,
   StatusBar,
   Dimensions,
+  Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from "react-native-safe-area-context";
+import { isAxiosError } from 'axios';
+import { useAuth, DEFAULT_AVATAR_URL } from "../src/context/AuthContext";
+import { buildCreatePostFormData, createPostApi, type UploadImageFile } from "../src/api/services/post.service";
+import { getFriendsApi } from "../src/api/services/friendship.service";
+import type { PostVisibility } from "../src/types/api.types";
+import CaptionSuggestion from "../src/components/CaptionSuggestion";
 
 const { width: screenWidth } = Dimensions.get('window');
+
+type RecipientEntry = {
+  id: string;
+  name: string;
+  avatar?: string;
+  avatarUrl?: string;
+  isGroup?: boolean;
+};
+
+const GROUP_RECIPIENT: RecipientEntry = {
+  id: 'all',
+  name: 'Tất cả',
+  avatar: '👥',
+  isGroup: true,
+};
 export default function PhotoPreviewScreen() {
   const router = useRouter();
   const { photoUri } = useLocalSearchParams();
+  const { user, token } = useAuth();
   const [selectedRecipients, setSelectedRecipients] = useState(['all']);
+  const [friendRecipients, setFriendRecipients] = useState<RecipientEntry[]>([]);
+  const [isLoadingFriends, setIsLoadingFriends] = useState(false);
   const [messageText, setMessageText] = useState('');
+  const [visibility] = useState<PostVisibility>('friends');
+  const [isSending, setIsSending] = useState(false);
+
+  const resolvedPhotoUri = useMemo(() => {
+    if (Array.isArray(photoUri)) {
+      return photoUri[0];
+    }
+    return photoUri;
+  }, [photoUri]);
 
 
+  const recipients = useMemo(() => {
+    return [GROUP_RECIPIENT, ...friendRecipients];
+  }, [friendRecipients]);
 
+  useEffect(() => {
+    let isMounted = true;
 
+    const fetchFriends = async () => {
+      setIsLoadingFriends(true);
+      try {
+        const response = await getFriendsApi();
+        const friends = response.data?.friends ?? [];
+        if (!isMounted) {
+          return;
+        }
+        const mappedRecipients: RecipientEntry[] = friends.map(friend => ({
+          id: friend.friendshipId || friend.id,
+          name: friend.displayName || friend.username,
+          avatarUrl: friend.avatarUrl,
+        }));
+        setFriendRecipients(mappedRecipients);
+      } catch (error) {
+        console.warn('[PhotoPreview] Failed to load friends', error);
+      } finally {
+        if (isMounted) {
+          setIsLoadingFriends(false);
+        }
+      }
+    };
 
-  const recipients = [
-    { id: 'all', name: 'Tất cả', avatar: '👥', isGroup: true },
-    { id: 'be', name: 'be', avatar: '👤' },
-    { id: 'mynh', name: 'MyNh...', avatar: '👤' },
-    { id: 'tn', name: 'TN', avatar: '👤' },
-  ];
+    fetchFriends();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const toggleRecipient = (id: string) => {
     if (id === 'all') {
@@ -47,39 +110,98 @@ export default function PhotoPreviewScreen() {
     }
   };
 
-  const handleSend = () => {
-    // Logic gửi ảnh
-    console.log('Gửi ảnh:', photoUri);
-    console.log('Tin nhắn:', messageText);
-    console.log('Người nhận:', selectedRecipients);
-    
-    // Tạo object ảnh mới để thêm vào history
-    const newPhoto = {
-      id: Date.now().toString(), // ID duy nhất
-      image: photoUri as string,
-      message: messageText || '',
-      sender: {
-        name: 'Bạn', // Tên người gửi (có thể lấy từ user data)
-        avatar: 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761231281/taskmanagement/avatars/a0hsc7oncibdgnvhbgbp.jpg', // Avatar của bạn
-        time: 'Vừa xong'
-      },
-      recipients: selectedRecipients,
-      timestamp: new Date().toISOString()
+  const imageFile = useMemo<UploadImageFile | null>(() => {
+    if (!resolvedPhotoUri) {
+      return null;
+    }
+
+    const normalizedUri =
+      Platform.OS === 'ios'
+        ? (resolvedPhotoUri as string).replace('file://', '')
+        : (resolvedPhotoUri as string);
+
+    const filename =
+      (resolvedPhotoUri as string).split('/').pop() ?? 'photo.jpg';
+    const match = /\.(\w+)$/.exec(filename.toLowerCase());
+    const extension = match ? match[1] : 'jpg';
+    const type =
+      extension === 'jpg' ? 'image/jpeg' : `image/${extension || 'jpeg'}`;
+
+    return {
+      uri: normalizedUri,
+      name: filename,
+      type,
     };
-    
-    // Lưu ảnh vào AsyncStorage hoặc state management
-    // Ở đây chúng ta sẽ sử dụng router để chuyển hướng và truyền data
-    router.push({
-      pathname: '/history',
-      params: {
-        newPhoto: JSON.stringify(newPhoto)
+  }, [resolvedPhotoUri]);
+
+  const handleSend = async () => {
+    if (isSending) {
+      return;
+    }
+
+    if (!token) {
+      Alert.alert('Chưa đăng nhập', 'Vui lòng đăng nhập để tiếp tục.');
+      router.push('/login');
+      return;
+    }
+
+    if (!imageFile || !resolvedPhotoUri) {
+      Alert.alert('Thiếu ảnh', 'Không tìm thấy ảnh để gửi. Vui lòng chụp lại.');
+      router.back();
+      return;
+    }
+
+    try {
+      setIsSending(true);
+
+      const formData = buildCreatePostFormData(
+        imageFile,
+        {
+          caption: messageText.trim() || undefined,
+          visibility,
+        }
+      );
+
+      const response = await createPostApi(formData);
+      const createdPost = response.data;
+
+      const newPhoto = {
+        id: createdPost._id,
+        image: createdPost.imageUrl,
+        message: createdPost.caption || '',
+        sender: {
+          name: user?.displayName || user?.username || 'Bạn',
+          avatar: user?.avatarUrl || DEFAULT_AVATAR_URL,
+          time: 'Vừa xong',
+        },
+        recipients: selectedRecipients,
+        timestamp: createdPost.createdAt,
+      };
+
+      router.push({
+        pathname: '/history',
+        params: {
+          newPhoto: JSON.stringify(newPhoto),
+        },
+      });
+    } catch (error) {
+      console.error('Error creating post:', error);
+      let message = 'Không thể gửi ảnh. Vui lòng thử lại.';
+      if (isAxiosError(error)) {
+        message = (error.response?.data as { message?: string })?.message || message;
       }
-    });
+      Alert.alert('Lỗi', message);
+    } finally {
+      setIsSending(false);
+    }
   };
 
 
   const handleCancel = () => {
     // Logic hủy và quay lại
+    if (isSending) {
+      return;
+    }
     router.back();
   };
 
@@ -101,7 +223,7 @@ export default function PhotoPreviewScreen() {
         {/* Photo Container - matching camera size from home */}
         <View style={styles.photoContainer}>
           <Image
-            source={{ uri: photoUri as string || 'https://via.placeholder.com/300x400/333/fff?text=Photo+Preview' }}
+            source={{ uri: resolvedPhotoUri as string || 'https://via.placeholder.com/300x400/333/fff?text=Photo+Preview' }}
             style={styles.photo}
             resizeMode="cover"
           />
@@ -125,17 +247,31 @@ export default function PhotoPreviewScreen() {
           <View style={styles.dot} />
         </View>
 
+        <CaptionSuggestion
+          image={imageFile}
+          disabled={isSending}
+          onApply={setMessageText}
+        />
+
         {/* Control Buttons */}
         <View style={styles.controlButtons}>
-          <TouchableOpacity style={styles.controlButton} onPress={handleCancel}>
+          <TouchableOpacity style={styles.controlButton} onPress={handleCancel} disabled={isSending}>
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-            <Ionicons name="paper-plane" size={28} color="#fff" />
+          <TouchableOpacity
+            style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
+            onPress={handleSend}
+            disabled={isSending}
+          >
+            {isSending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Ionicons name="paper-plane" size={28} color="#fff" />
+            )}
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.controlButton} onPress={handleAddText}>
+          <TouchableOpacity style={styles.controlButton} onPress={handleAddText} disabled={isSending}>
             <Text style={styles.textIcon}>Aa</Text>
           </TouchableOpacity>
         </View>
@@ -158,8 +294,12 @@ export default function PhotoPreviewScreen() {
               ]}>
                 {recipient.isGroup ? (
                   <Ionicons name="people" size={20} color="#fff" />
+                ) : recipient.avatarUrl ? (
+                  <Image source={{ uri: recipient.avatarUrl }} style={styles.recipientImage} />
                 ) : (
-                  <Text style={styles.avatarText}>{recipient.avatar}</Text>
+                  <Text style={styles.avatarText}>
+                    {recipient.avatar || recipient.name.charAt(0).toUpperCase()}
+                  </Text>
                 )}
               </View>
               <Text style={[
@@ -170,6 +310,18 @@ export default function PhotoPreviewScreen() {
               </Text>
             </TouchableOpacity>
           ))}
+          {isLoadingFriends && (
+            <View style={styles.loadingRecipients}>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.loadingText}>Đang tải bạn bè...</Text>
+            </View>
+          )}
+          {!isLoadingFriends && friendRecipients.length === 0 && (
+            <View style={styles.loadingRecipients}>
+              <Ionicons name="information-circle" size={18} color="#fff" />
+              <Text style={styles.loadingText}>Chưa có bạn bè nào</Text>
+            </View>
+          )}
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -274,6 +426,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 20,
   },
+  sendButtonDisabled: {
+    opacity: 0.7,
+  },
   textIcon: {
     color: '#fff',
     fontSize: 18,
@@ -314,5 +469,20 @@ const styles = StyleSheet.create({
   },
   selectedRecipient: {
     // Additional styling for selected state
+  },
+  recipientImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  loadingRecipients: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  loadingText: {
+    color: '#aaa',
+    marginLeft: 6,
+    fontSize: 12,
   },
 });

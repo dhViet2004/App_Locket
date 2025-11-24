@@ -168,4 +168,26 @@ export const searchUsers = asyncHandler(async (req: AuthRequest, res: Response) 
   return res.status(200).json(ok(users, 'Search results'));
 });
 
+/**
+ * Lấy thông tin user hiện tại
+ * GET /api/users/me
+ */
+export const getCurrentUser = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.userId) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+
+  const user = await User.findById(req.userId);
+  
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  // Trả về user đã cập nhật (loại bỏ passwordHash)
+  const userObj = user.toObject();
+  delete (userObj as any).passwordHash;
+
+  return res.status(200).json(ok(userObj, 'User retrieved successfully'));
+});
+
 export const { list, getById, create, updateById, removeById } = buildCrud(User);

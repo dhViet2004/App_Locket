@@ -5,12 +5,14 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { useLoginForm } from "../../src/context/LoginContext";
 import { useAuth } from "../../src/context/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function LoginPasswordScreen() {
   const { identifier, reset: resetLoginForm } = useLoginForm();
   const { user, login, loading, clearError, error } = useAuth();
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (!identifier.trim()) {
@@ -100,11 +102,21 @@ export default function LoginPasswordScreen() {
             placeholderTextColor="#999999"
             value={password}
             onChangeText={handlePasswordChange}
-            secureTextEntry
+            secureTextEntry={!showPassword}
             autoCapitalize="none"
             autoCorrect={false}
             autoFocus
           />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowPassword((prev) => !prev)}
+          >
+            <Ionicons
+              name={showPassword ? "eye-outline" : "eye-off-outline"}
+              size={22}
+              color="#999999"
+            />
+          </TouchableOpacity>
         </View>
 
         {!!formError && <Text style={styles.errorText}>{formError}</Text>}
@@ -185,16 +197,27 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: 20,
+    position: "relative",
   },
   input: {
     backgroundColor: '#1A1A1A',
     borderRadius: 25,
     paddingHorizontal: 20,
     paddingVertical: 16,
+    paddingRight: 52,
     fontSize: 16,
     color: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#333333',
+  },
+  eyeButton: {
+    position: "absolute",
+    right: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 8,
   },
   forgotPassword: {
     alignSelf: 'flex-end',

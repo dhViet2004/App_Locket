@@ -1,9 +1,9 @@
-import { Text, View, StyleSheet, TouchableOpacity, Dimensions, ScrollView, TextInput, Modal, PanResponder, Animated } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, Dimensions, ScrollView, TextInput, Modal, PanResponder, Animated, Image } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Stack, useRouter, Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, CameraType, FlashMode } from "expo-camera";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import * as ScreenOrientation from 'expo-screen-orientation';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
@@ -11,17 +11,56 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import { useAuth } from "../src/context/AuthContext";
+import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
+import { getFriendsApi } from "../src/api/services/friendship.service";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [cameraType, setCameraType] = useState<CameraType>('back');
   const [flashMode, setFlashMode] = useState<FlashMode>('off');
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [showFriendsModal, setShowFriendsModal] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [friendCount, setFriendCount] = useState(0);
   const cameraRef = useRef<CameraView>(null);
+
+  useEffect(() => {
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      shouldDuckAndroid: false,
+      playThroughEarpieceAndroid: false,
+    }).catch((error: unknown) => console.warn('Failed to set audio mode', error));
+  }, []);
+  
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchFriendCount = async () => {
+      try {
+        const response = await getFriendsApi();
+        const nextCount = response.data?.count ?? response.data?.friends?.length ?? 0;
+        if (isMounted) {
+          setFriendCount(nextCount);
+        }
+      } catch (error) {
+        console.warn('[Home] Failed to fetch friend count', error);
+      }
+    };
+
+    fetchFriendCount();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   
   // Hide debug text in development
   if (__DEV__) {
@@ -165,10 +204,31 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          {/* Profile Icon */}
-          <TouchableOpacity style={styles.headerButton} onPress={() => router.push('/profile')}>
+          {/* Profile Avatar */}
+          <TouchableOpacity 
+            style={styles.headerButton} 
+            onPress={() => {
+              console.log('[Home] Profile button pressed');
+              console.log('[Home] Navigation state before push:', {
+                hasUser: !!user,
+                userId: user?.id,
+                username: user?.username,
+              });
+              router.push('/profile');
+            }}
+            activeOpacity={0.7}
+          >
             <View style={styles.profileIcon}>
-              <FontAwesome5 name="user-circle" size={24} color="white" />
+              {user?.avatarUrl ? (
+                <Image
+                  source={{
+                    uri: user.avatarUrl
+                  }}
+                  style={styles.profileAvatar}
+                />
+              ) : (
+                <FontAwesome5 name="user-circle" size={24} color="white" />
+              )}
             </View>
           </TouchableOpacity>
 
@@ -176,6 +236,9 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.friendsButton} onPress={openFriendsModal}>
             <FontAwesome5 name="user-friends" size={14} color="white" />
             <Text style={styles.friendsText}> Bạn bè</Text>
+            <View style={styles.friendCountBadge}>
+              <Text style={styles.friendCountText}>{friendCount}</Text>
+            </View>
           </TouchableOpacity>
 
           {/* Chat Icon */}
@@ -399,6 +462,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  profileAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   profileIconText: {
     fontSize: 20,
@@ -419,6 +488,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '500',
+  },
+  friendCountBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    backgroundColor: '#FF8C00',
+  },
+  friendCountText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '700',
   },
   chatIcon: {
     width: 40,

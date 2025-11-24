@@ -18,6 +18,7 @@
       }
     },
     "android": {
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/icon.png",
@@ -65,6 +66,13 @@
         "expo-camera",
         {
           "cameraPermission": "Cho phép Locket sử dụng camera để chụp ảnh."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép Locket truy cập thư viện ảnh để chọn avatar.",
+          "cameraPermission": "Cho phép Locket sử dụng camera để chụp avatar."
         }
       ]
     ],

@@ -4,11 +4,14 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRegisterForm } from "../../src/context/RegisterContext";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function PasswordScreen() {
   const { data, setPassword } = useRegisterForm();
   const [password, setPasswordInput] = useState(data.password);
   const [confirmPassword, setConfirmPassword] = useState(data.password);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Password validation function
   const isValidPassword = (password: string) => {
@@ -61,11 +64,21 @@ export default function PasswordScreen() {
               placeholderTextColor="#666666"
               value={password}
               onChangeText={setPasswordInput}
-              secureTextEntry
+              secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus
             />
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() => setShowPassword((prev) => !prev)}
+            >
+              <Ionicons
+                name={showPassword ? "eye-outline" : "eye-off-outline"}
+                size={22}
+                color="#999999"
+              />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.inputContainer}>
@@ -75,18 +88,28 @@ export default function PasswordScreen() {
               placeholderTextColor="#666666"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
-              secureTextEntry
+              secureTextEntry={!showConfirmPassword}
               autoCapitalize="none"
               autoCorrect={false}
             />
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() => setShowConfirmPassword((prev) => !prev)}
+            >
+              <Ionicons
+                name={showConfirmPassword ? "eye-outline" : "eye-off-outline"}
+                size={22}
+                color="#999999"
+              />
+            </TouchableOpacity>
           </View>
 
-          {password && !isValidPassword(password) && (
+          {password.length > 0 && !isValidPassword(password) ? (
             <Text style={styles.errorText}>Mật khẩu phải có ít nhất 8 ký tự</Text>
-          )}
-          {password && confirmPassword && password !== confirmPassword && (
+          ) : null}
+          {password.length > 0 && confirmPassword.length > 0 && password !== confirmPassword ? (
             <Text style={styles.errorText}>Mật khẩu không khớp</Text>
-          )}
+          ) : null}
         </View>
 
         {/* Footer */}
@@ -159,16 +182,27 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: 20,
+    position: 'relative',
   },
   input: {
     backgroundColor: '#1A1A1A',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 16,
+    paddingRight: 52,
     fontSize: 16,
     color: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#333333',
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
   },
   errorText: {
     color: '#FF4444',

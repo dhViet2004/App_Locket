@@ -1,24 +1,21 @@
-import { Text, View, StyleSheet, TouchableOpacity, Alert, Image } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router, Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AddWidgetPromptModal } from "../../src/components/AddWidgetPromptModal";
+import { useAddWidgetPrompt } from "../../src/hooks/useAddWidgetPrompt";
 
 export default function WidgetScreen() {
+  const {
+    openAddWidgetPrompt,
+    isPromptVisible,
+    closePrompt,
+    confirmAddWidget,
+    isProcessing,
+  } = useAddWidgetPrompt();
+
   const handleAddWidget = () => {
-    // TODO: Implement widget addition logic
-    Alert.alert(
-      "Thêm tiện ích",
-      "Tính năng thêm tiện ích sẽ được triển khai trong phiên bản tiếp theo.",
-      [
-        {
-          text: "OK",
-          onPress: () => {
-            // Navigate to main app after widget setup
-            router.replace("/");
-          }
-        }
-      ]
-    );
+    openAddWidgetPrompt();
   };
 
   const handleShowGuide = () => {
@@ -36,6 +33,9 @@ export default function WidgetScreen() {
           {/* Title */}
           <Text style={styles.title}>
             Cuối cùng, hãy thêm tiện ích vào màn hình chính của bạn
+          </Text>
+          <Text style={styles.subtitle}>
+            Widget của Locket sẽ tự động hiển thị post mới nhất từ bạn bè ngay khi họ đăng, kể cả khi bạn không mở app.
           </Text>
 
           {/* Phone Illustration */}
@@ -61,6 +61,12 @@ export default function WidgetScreen() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+      <AddWidgetPromptModal
+        visible={isPromptVisible}
+        onClose={closePrompt}
+        onConfirm={confirmAddWidget}
+        loading={isProcessing}
+      />
     </>
   );
 }
@@ -82,8 +88,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     lineHeight: 36,
-    marginBottom: 60,
+    marginBottom: 16,
     paddingHorizontal: 10,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#CCCCCC',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 44,
+    paddingHorizontal: 16,
   },
   phoneContainer: {
     alignItems: 'center',
