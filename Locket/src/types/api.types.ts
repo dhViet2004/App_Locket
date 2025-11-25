@@ -13,6 +13,7 @@ export interface AuthUser {
   email?: string;
   phone?: string;
   avatarUrl?: string;
+  isActive: boolean;
   roles: string[];
   createdAt: string;
   updatedAt: string;
