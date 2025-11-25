@@ -6,6 +6,7 @@ export interface ApiResponse<T> {
 
 // Auth
 export interface AuthUser {
+  _id: string;
   id: string;
   username: string;
   displayName?: string;
@@ -109,6 +110,44 @@ export interface FriendSummary extends AuthUser {
 export interface FriendsListResponse {
   friends: FriendSummary[];
   count: number;
+}
+
+// Feed
+export interface FeedPostAuthor {
+  _id: string;
+  id?: string;
+  username: string;
+  avatarUrl?: string;
+  displayName?: string;
+}
+
+export interface FeedPost {
+  _id: string;
+  author: FeedPostAuthor;
+  imageUrl: string;
+  caption?: string;
+  visibility: PostVisibility;
+  reactionCount: number;
+  commentCount: number;
+  reactionCounts: Record<string, number>;
+  viewers: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FeedItem {
+  type: 'post' | 'ad';
+  data: FeedPost;
+}
+
+export interface FeedPagination {
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export interface FeedResponse {
+  data: FeedItem[];
+  pagination: FeedPagination;
 }
 
 

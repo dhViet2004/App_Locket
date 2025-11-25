@@ -18,6 +18,8 @@ import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../src/context/AuthContext";
 import { getFriendsApi } from "../src/api/services/friendship.service";
+import { getFeedApi } from "../src/api/services/feed.service";
+import type { FeedItem, FriendSummary } from "../src/types/api.types";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -30,78 +32,96 @@ export default function HistoryScreen() {
   const [selectedCategory, setSelectedCategory] = useState('Smileys & People');
   const [searchQuery, setSearchQuery] = useState('');
   const [friendCount, setFriendCount] = useState(0);
-  
+  const [friends, setFriends] = useState<FriendSummary[]>([]);
+  const [feedData, setFeedData] = useState<FeedItem[]>([]);
+
   // Grid view states
   const [viewMode, setViewMode] = useState<'fullscreen' | 'grid'>('fullscreen');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-  // Mock data for history feed - matching the sample image
-  const baseHistoryData = [
-    {
-      id: '1',
-      image: 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761379944/hotgirl-tran-ha-linh-bi-boc-tran-qua-khu-lieu-co-an-o-nhu-thoi-nguyen-thuy-them-1-clip-gay-bao-ba6-6951964_lnvtpy.png',
-      message: 'Hi mấy anh',
-      sender: {
-        name: 'Trần Hà Linh',
-        avatar: 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761379944/hotgirl-tran-ha-linh-bi-boc-tran-qua-khu-lieu-co-an-o-nhu-thoi-nguyen-thuy-them-1-clip-gay-bao-ba6-6951964_lnvtpy.png',
-        time: '3h'
-      }
-    },
-    {
-      id: '2',
-      image: 'https://tse3.mm.bing.net/th/id/OIP.ynnE-XdeMpEAe4DlKhOgJAHaHa?rs=1&pid=ImgDetMain&o=7&rm=3',
-      message: 'Chào buổi sáng!',
-      sender: {
-        name: 'Nguyễn Mạnh Cường',
-        avatar: 'https://tse3.mm.bing.net/th/id/OIP.ynnE-XdeMpEAe4DlKhOgJAHaHa?rs=1&pid=ImgDetMain&o=7&rm=3',
-        time: '5h'
-      }
-    },
-    {
-      id: '3',
-      image: 'https://tse2.mm.bing.net/th/id/OIP.hfSgSQHhVVPBTCDtJwM0FAHaJ4?rs=1&pid=ImgDetMain&o=7&rm=3',
-      message: 'Hôm nay trời đẹp quá',
-      sender: {
-        name: 'Đoàn Thị Bích Ngọc',
-        avatar: 'https://tse2.mm.bing.net/th/id/OIP.hfSgSQHhVVPBTCDtJwM0FAHaJ4?rs=1&pid=ImgDetMain&o=7&rm=3',
-        time: '1d'
-      }
+  // Format thời gian từ ISO string sang "3h", "5h", "1d", etc.
+  const formatTimeAgo = (createdAt: string): string => {
+    const now = new Date();
+    const created = new Date(createdAt);
+    const diffInMs = now.getTime() - created.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    const diffInDays = Math.floor(diffInHours / 24);
+
+    if (diffInDays > 0) {
+      return `${diffInDays}d`;
+    } else if (diffInHours > 0) {
+      return `${diffInHours}h`;
+    } else if (diffInMinutes > 0) {
+      return `${diffInMinutes}m`;
+    } else {
+      return 'Vừa xong';
     }
-  ];
+  };
+
+  // Map dữ liệu từ API sang format hiện tại của component
+  const mapFeedToHistoryData = (feedItems: FeedItem[]) => {
+    return feedItems
+      .filter(item => item.type === 'post') // Chỉ lấy posts, bỏ qua ads nếu có
+      .map(item => ({
+        id: item.data._id,
+        image: item.data.imageUrl,
+        message: item.data.caption || '',
+        sender: {
+          id: item.data.author._id || item.data.author.id,
+          name: item.data.author.displayName || item.data.author.username,
+          avatar: item.data.author.avatarUrl || '',
+          time: formatTimeAgo(item.data.createdAt)
+        }
+      }));
+  };
 
   // Thêm ảnh mới vào đầu danh sách nếu có
   const getHistoryData = () => {
+    const mappedData = mapFeedToHistoryData(feedData);
+
     if (newPhoto) {
       try {
         const parsedNewPhoto = JSON.parse(newPhoto as string);
-        return [parsedNewPhoto, ...baseHistoryData];
+        return [parsedNewPhoto, ...mappedData];
       } catch (error) {
         console.error('Error parsing new photo:', error);
-        return baseHistoryData;
+        return mappedData;
       }
     }
-    return baseHistoryData;
+    return mappedData;
   };
 
   const historyData = getHistoryData();
 
+  const filteredHistoryData = selectedFilter === 'all'
+    ? historyData
+    : historyData.filter(item => item.sender.id === selectedFilter);
+
   useEffect(() => {
     let isMounted = true;
 
-    const fetchFriendCount = async () => {
+    const fetchData = async () => {
       try {
-        const response = await getFriendsApi();
-        const nextCount = response.data?.count ?? response.data?.friends?.length ?? 0;
-        if (isMounted) {
-          setFriendCount(nextCount);
+        // Fetch feed data
+        const feedResponse = await getFeedApi({ page: 1, limit: 20 });
+        if (isMounted && feedResponse.data?.data) {
+          setFeedData(feedResponse.data.data);
+        }
+
+        // Fetch friend count and list
+        const friendsResponse = await getFriendsApi();
+        if (isMounted && friendsResponse.data) {
+          setFriends(friendsResponse.data.friends || []);
+          setFriendCount(friendsResponse.data.count ?? friendsResponse.data.friends?.length ?? 0);
         }
       } catch (error) {
-        console.warn('[History] Failed to fetch friend count', error);
+        console.warn('[History] Failed to fetch data', error);
       }
     };
 
-    fetchFriendCount();
+    fetchData();
 
     return () => {
       isMounted = false;
@@ -186,7 +206,7 @@ export default function HistoryScreen() {
   const handleGestureStateChange = (event: any) => {
     if (event.nativeEvent.state === State.END) {
       const { translationY, velocityY } = event.nativeEvent;
-      
+
       // Check if it's a swipe up gesture - more sensitive thresholds
       if (translationY < -30 && velocityY < -300) {
         // Swipe up detected - switch to fullscreen
@@ -197,17 +217,17 @@ export default function HistoryScreen() {
 
   return (
     <>
-      <Stack.Screen 
-        options={{ 
+      <Stack.Screen
+        options={{
           headerShown: false,
           navigationBarColor: '#000000',
           statusBarStyle: 'light',
           statusBarBackgroundColor: '#000000'
-        }} 
+        }}
       />
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#000" />
-        
+
         {/* Header */}
         <View style={styles.header}>
           {viewMode === 'fullscreen' ? (
@@ -222,7 +242,7 @@ export default function HistoryScreen() {
                   )}
                 </View>
               </TouchableOpacity>
-              
+
               <TouchableOpacity onPress={handleFriends} style={styles.friendsButton}>
                 <FontAwesome5 name="user-friends" size={14} color="#fff" />
                 <Text style={styles.friendsText}> Bạn bè</Text>
@@ -230,7 +250,7 @@ export default function HistoryScreen() {
                   <Text style={styles.friendCountText}>{friendCount}</Text>
                 </View>
               </TouchableOpacity>
-              
+
               <TouchableOpacity onPress={handleChat} style={styles.headerButton}>
                 <View style={styles.chatIcon}>
                   <Ionicons name="chatbubble-outline" size={24} color="#fff" />
@@ -241,21 +261,24 @@ export default function HistoryScreen() {
             /* Grid View Header */
             <>
               <TouchableOpacity onPress={handleProfile} style={styles.headerButton}>
-                <Image 
-                  source={{ uri: 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761231281/taskmanagement/avatars/a0hsc7oncibdgnvhbgbp.jpg' }} 
-                  style={styles.profileAvatar} 
+                <Image
+                  source={{ uri: 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761231281/taskmanagement/avatars/a0hsc7oncibdgnvhbgbp.jpg' }}
+                  style={styles.profileAvatar}
                 />
               </TouchableOpacity>
-              
-              <TouchableOpacity 
-                onPress={() => setShowFilterModal(true)} 
+
+              <TouchableOpacity
+                onPress={() => setShowFilterModal(true)}
                 style={styles.filterButton}
               >
                 <Text style={styles.filterText}>
-                  {selectedFilter === 'all' ? 'Tất cả bạn bè' : selectedFilter} ⌄
+                  {selectedFilter === 'all'
+                    ? 'Tất cả bạn bè'
+                    : friends.find(f => (f._id || f.id) === selectedFilter)?.displayName || friends.find(f => (f._id || f.id) === selectedFilter)?.username || 'Bạn bè'}
                 </Text>
+                <FontAwesome5 name="caret-down" size={14} color="#fff" style={{ marginLeft: 6 }} />
               </TouchableOpacity>
-              
+
               <TouchableOpacity onPress={handleCamera} style={styles.headerButton}>
                 <Ionicons name="camera" size={24} color="#fff" />
               </TouchableOpacity>
@@ -266,16 +289,16 @@ export default function HistoryScreen() {
         {/* Main Content - Conditional Rendering */}
         {viewMode === 'fullscreen' ? (
           /* Full Screen View */
-          <ScrollView 
-            style={styles.scrollView} 
+          <ScrollView
+            style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             pagingEnabled={true}
             snapToInterval={screenHeight - 200}
             snapToAlignment="start"
             decelerationRate="fast"
           >
-            {historyData.map((item, index) => (
-              <View key={item.id} style={styles.feedItem}>
+            {filteredHistoryData.map((item, index) => (
+              <View key={`feed-fullscreen-${index}`} style={styles.feedItem}>
                 {/* Image Container - Full screen */}
                 <View style={styles.imageContainer}>
                   <Image source={{ uri: item.image }} style={styles.feedImage} />
@@ -285,7 +308,7 @@ export default function HistoryScreen() {
                     </View>
                   )}
                 </View>
-                
+
                 {/* Sender Info - Below image */}
                 <View style={styles.senderInfo}>
                   <Image source={{ uri: item.sender.avatar }} style={styles.senderAvatar} />
@@ -302,14 +325,14 @@ export default function HistoryScreen() {
             onHandlerStateChange={handleGestureStateChange}
           >
             <View style={styles.gridContainer}>
-              <ScrollView 
+              <ScrollView
                 style={styles.gridScrollView}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.gridContent}
               >
-                {historyData.map((item, index) => (
-                  <TouchableOpacity 
-                    key={item.id} 
+                {filteredHistoryData.map((item, index) => (
+                  <TouchableOpacity
+                    key={`feed-grid-${index}`}
                     style={styles.gridItem}
                     onPress={() => handleImagePress(item.id)}
                   >
@@ -374,17 +397,17 @@ export default function HistoryScreen() {
         {viewMode === 'fullscreen' && (
           <View style={styles.bottomNav}>
             <TouchableOpacity onPress={handleGrid} style={styles.navButton}>
-              <Ionicons 
-                name="grid-outline" 
-                size={24} 
-                color="#fff" 
+              <Ionicons
+                name="grid-outline"
+                size={24}
+                color="#fff"
               />
             </TouchableOpacity>
-            
+
             <TouchableOpacity onPress={handleCamera} style={styles.cameraButton}>
               <View style={styles.cameraButtonInner} />
             </TouchableOpacity>
-            
+
             <TouchableOpacity style={styles.navButton}>
               <Ionicons name="ellipsis-horizontal" size={24} color="#fff" />
             </TouchableOpacity>
@@ -399,12 +422,12 @@ export default function HistoryScreen() {
           animationType="slide"
           onRequestClose={() => setShowEmojiPicker(false)}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.emojiModalOverlay}
             activeOpacity={1}
             onPress={() => setShowEmojiPicker(false)}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.emojiModal}
               activeOpacity={1}
               onPress={(e) => e.stopPropagation()}
@@ -429,7 +452,7 @@ export default function HistoryScreen() {
 
               {/* Emoji Grid Container */}
               <View style={styles.emojiGridContainer}>
-                <ScrollView 
+                <ScrollView
                   style={styles.emojiModalContent}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.emojiScrollContent}
@@ -437,7 +460,7 @@ export default function HistoryScreen() {
                   <View style={styles.emojiGrid}>
                     {getFilteredEmojis().map((emoji, index) => (
                       <TouchableOpacity
-                        key={index}
+                        key={`${emoji}-${index}`}
                         style={styles.emojiPickerButton}
                         onPress={() => handleEmojiSelect(emoji)}
                       >
@@ -462,10 +485,10 @@ export default function HistoryScreen() {
                       setSearchQuery('');
                     }}
                   >
-                    <Ionicons 
-                      name={categoryIcons[category as keyof typeof categoryIcons] as any} 
-                      size={20} 
-                      color={selectedCategory === category ? '#fff' : '#666'} 
+                    <Ionicons
+                      name={categoryIcons[category as keyof typeof categoryIcons] as any}
+                      size={20}
+                      color={selectedCategory === category ? '#fff' : '#666'}
                     />
                   </TouchableOpacity>
                 ))}
@@ -484,12 +507,12 @@ export default function HistoryScreen() {
           animationType="slide"
           onRequestClose={() => setShowFilterModal(false)}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.filterModalOverlay}
             activeOpacity={1}
             onPress={() => setShowFilterModal(false)}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.filterModal}
               activeOpacity={1}
               onPress={(e) => e.stopPropagation()}
@@ -500,9 +523,9 @@ export default function HistoryScreen() {
                   <Ionicons name="close" size={24} color="#fff" />
                 </TouchableOpacity>
               </View>
-              
+
               <ScrollView style={styles.filterContent}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.filterOption, selectedFilter === 'all' && styles.filterOptionSelected]}
                   onPress={() => handleFilterChange('all')}
                 >
@@ -510,33 +533,21 @@ export default function HistoryScreen() {
                     Tất cả bạn bè
                   </Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.filterOption, selectedFilter === 'be' && styles.filterOptionSelected]}
-                  onPress={() => handleFilterChange('be')}
-                >
-                  <Text style={[styles.filterOptionText, selectedFilter === 'be' && styles.filterOptionTextSelected]}>
-                    be
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.filterOption, selectedFilter === 'Alice' && styles.filterOptionSelected]}
-                  onPress={() => handleFilterChange('Alice')}
-                >
-                  <Text style={[styles.filterOptionText, selectedFilter === 'Alice' && styles.filterOptionTextSelected]}>
-                    Alice
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.filterOption, selectedFilter === 'Bob' && styles.filterOptionSelected]}
-                  onPress={() => handleFilterChange('Bob')}
-                >
-                  <Text style={[styles.filterOptionText, selectedFilter === 'Bob' && styles.filterOptionTextSelected]}>
-                    Bob
-                  </Text>
-                </TouchableOpacity>
+
+                {friends.map((friend, index) => {
+                  const friendId = friend._id || friend.id || `friend-${index}`;
+                  return (
+                    <TouchableOpacity
+                      key={`${friendId}-${index}`}
+                      style={[styles.filterOption, selectedFilter === friendId && styles.filterOptionSelected]}
+                      onPress={() => handleFilterChange(friendId)}
+                    >
+                      <Text style={[styles.filterOptionText, selectedFilter === friendId && styles.filterOptionTextSelected]}>
+                        {friend.displayName || friend.username}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -864,7 +875,7 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   gridItem: {
-    width: (screenWidth - 6) / 3,
+    width: (screenWidth - 12) / 4,
     aspectRatio: 1,
     margin: 1,
     borderRadius: 8,
