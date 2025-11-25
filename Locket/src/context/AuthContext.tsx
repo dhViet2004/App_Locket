@@ -57,6 +57,7 @@ interface AuthContextValue {
   token: string | null;
   loading: boolean;
   error: string | null;
+  isAccountLocked: boolean;
   login: (identifier: string, password: string) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -89,13 +90,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true); // Bắt đầu với loading = true để restore từ storage
   const [error, setError] = useState<string | null>(null);
-  
+  const [isAccountLocked, setIsAccountLocked] = useState(false);
+
   // Ref để tránh gọi refreshUser() đồng thời nhiều lần
   const refreshUserPromiseRef = React.useRef<Promise<void> | null>(null);
-  
+
   // Ref để đánh dấu đang trong quá trình logout (tránh restore lại sau logout)
   const isLoggingOutRef = React.useRef(false);
-  
+
   // Restore auth state từ storage khi app khởi động
   useEffect(() => {
     const restoreAuth = async () => {
@@ -105,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         return;
       }
-      
+
       try {
         console.log('[AuthContext] 🔄 Restoring auth from storage...');
         const [storedToken, storedUserJson] = await Promise.all([
@@ -133,6 +135,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             const userResponse = await getUserProfileApi();
             if (userResponse.data) {
+              // Check if account is locked
+              if (userResponse.data.isActive === false) {
+                console.log('[AuthContext] ⚠️ Account is locked');
+                setIsAccountLocked(true);
+                // Clear auth and stop restore
+                await storage.removeItem(AUTH_TOKEN_KEY);
+                await storage.removeItem(AUTH_USER_KEY);
+                setToken(null);
+                setUser(null);
+                setLoading(false);
+                return;
+              }
+
               console.log('[AuthContext] ✅ User refreshed from API:', userResponse.data.id);
               setUser(withDefaultAvatar(userResponse.data));
               // Lưu lại user mới vào storage
@@ -176,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userWithAvatar = withDefaultAvatar(payload.user);
     setUser(userWithAvatar);
     setToken(payload.token);
-    
+
     // Lưu vào storage
     try {
       await storage.setItem(AUTH_TOKEN_KEY, payload.token);
@@ -209,13 +224,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         apiClient.defaults.headers.common.Authorization = `Bearer ${response.data.token}`;
         try {
           const userResponse = await getUserProfileApi();
+          if (!userResponse.data) {
+            throw new Error('Không thể lấy thông tin người dùng');
+          }
+
           const refreshedUser = withDefaultAvatar(userResponse.data);
+
+          // Check if account is locked
+          if (refreshedUser && refreshedUser.isActive === false) {
+            setIsAccountLocked(true);
+            // Clear auth state
+            await storage.removeItem(AUTH_TOKEN_KEY);
+            await storage.removeItem(AUTH_USER_KEY);
+            setToken(null);
+            setUser(null);
+            throw new Error('Tài khoản của bạn đã bị khóa');
+          }
+
           setUser(refreshedUser);
           // Cập nhật user mới vào storage
           await storage.setItem(AUTH_USER_KEY, JSON.stringify(refreshedUser));
         } catch (refreshErr) {
-          console.error('Error refreshing user after login:', refreshErr);
-          // Nếu refresh fail, vẫn dùng data từ login response
+          // Nếu là account locked error, không log vì đây là expected behavior
+          if (refreshErr instanceof Error && refreshErr.message !== 'Tài khoản của bạn đã bị khóa') {
+            console.error('Error refreshing user after login:', refreshErr);
+          }
+          // Throw error để outer catch block xử lý
+          throw refreshErr;
         }
       }
       return response.data;
@@ -237,10 +272,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     console.log('[AuthContext] 🔄 Logging out...');
-    
+
     // Đánh dấu đang logout để tránh restore lại
     isLoggingOutRef.current = true;
-    
+
+    // Reset account locked state
+    setIsAccountLocked(false);
+
     // Disconnect socket trước
     try {
       socketService.disconnect();
@@ -248,14 +286,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('[AuthContext] ❌ Failed to disconnect socket:', error);
     }
-    
+
     // Xóa Authorization header
     delete apiClient.defaults.headers.common.Authorization;
-    
+
     // Clear state TRƯỚC khi xóa storage
     setUser(null);
     setToken(null);
-    
+
     // Xóa khỏi storage
     try {
       await storage.removeItem(AUTH_TOKEN_KEY);
@@ -264,20 +302,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('[AuthContext] ❌ Failed to clear auth from storage:', error);
     }
-    
+
     // Đợi một chút để đảm bảo state đã được clear
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     // Reset flag sau khi logout hoàn thành
     isLoggingOutRef.current = false;
-    
+
     console.log('[AuthContext] ✅ Logout completed');
   }, []);
 
   const updateUser = useCallback(async (updatedUser: AuthUser) => {
     const userWithAvatar = withDefaultAvatar(updatedUser);
     setUser(userWithAvatar);
-    
+
     // Cập nhật vào storage
     try {
       await storage.setItem(AUTH_USER_KEY, JSON.stringify(userWithAvatar));
@@ -294,7 +332,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tokenLength: token?.length || 0,
       tokenPreview: token ? `${token.substring(0, 20)}...` : 'null',
     });
-    
+
     if (!token) {
       console.warn('[AuthContext] ⚠️ refreshUser() skipped - no token');
       return;
@@ -326,13 +364,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           message: err instanceof Error ? err.message : String(err),
           responseData: isAxiosError(err) ? err.response?.data : 'N/A',
         });
-        
+
         // Nếu lỗi 401 (Unauthorized), token có thể đã hết hạn
         if (isAxiosError(err) && err.response?.status === 401) {
           console.warn('[AuthContext] ⚠️ 401 Unauthorized - token may be expired or invalid');
           console.warn('[AuthContext] ⚠️ User may be logged out or redirected');
         }
-        
+
         // Không throw error để không làm gián đoạn flow
       } finally {
         // Clear promise ref khi hoàn thành (thành công hoặc lỗi)
@@ -360,6 +398,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       loading,
       error,
+      isAccountLocked,
       login,
       logout,
       clearError,
@@ -367,7 +406,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateUser,
       refreshUser,
     }),
-    [user, token, loading, error, login, logout, clearError, setAuthState, updateUser, refreshUser],
+    [user, token, loading, error, isAccountLocked, login, logout, clearError, setAuthState, updateUser, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
