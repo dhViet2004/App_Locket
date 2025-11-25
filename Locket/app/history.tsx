@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   StatusBar,
   Dimensions,
   Modal,
+  Alert,
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../src/context/AuthContext";
 import { getFriendsApi } from "../src/api/services/friendship.service";
 import { getFeedApi } from "../src/api/services/feed.service";
+import { deletePostApi } from "../src/api/services/post.service";
 import type { FeedItem, FriendSummary } from "../src/types/api.types";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -39,6 +41,14 @@ export default function HistoryScreen() {
   const [viewMode, setViewMode] = useState<'fullscreen' | 'grid'>('fullscreen');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [showFilterModal, setShowFilterModal] = useState(false);
+
+  // Delete post modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+
+  // Scroll to specific post
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [selectedPostIndex, setSelectedPostIndex] = useState<number>(0);
 
   // Format thời gian từ ISO string sang "3h", "5h", "1d", etc.
   const formatTimeAgo = (createdAt: string): string => {
@@ -128,6 +138,19 @@ export default function HistoryScreen() {
     };
   }, []);
 
+  // Scroll to selected post when switching to fullscreen
+  useEffect(() => {
+    if (viewMode === 'fullscreen' && scrollViewRef.current && selectedPostIndex > 0) {
+      // Delay scroll to ensure view is rendered
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({
+          y: selectedPostIndex * (screenHeight - 200),
+          animated: false,
+        });
+      }, 100);
+    }
+  }, [viewMode, selectedPostIndex]);
+
   // Emoji categories for the picker
   const emojiCategories = {
     'Smileys & People': ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓'],
@@ -192,10 +215,45 @@ export default function HistoryScreen() {
     setShowFilterModal(false);
   };
 
-  const handleImagePress = (imageId: string) => {
+  const handleImagePress = (imageId: string, authorId: string) => {
     if (viewMode === 'grid') {
+      // Tìm index của post được click
+      const postIndex = filteredHistoryData.findIndex(item => item.id === imageId);
+      if (postIndex !== -1) {
+        setSelectedPostIndex(postIndex);
+      }
+      // Chuyển sang fullscreen khi click vào bất kỳ post nào
       setViewMode('fullscreen');
-      // Scroll to specific image
+    }
+  };
+
+  const handleLongPress = (postId: string, authorId: string) => {
+    // Chỉ cho phép xóa post nếu là post của user
+    if (authorId === user?.id || authorId === user?._id) {
+      setSelectedPostId(postId);
+      setShowDeleteModal(true);
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!selectedPostId) return;
+
+    try {
+      await deletePostApi(selectedPostId);
+
+      // Refresh feed data
+      const feedResponse = await getFeedApi({ page: 1, limit: 20 });
+      if (feedResponse.data?.data) {
+        setFeedData(feedResponse.data.data);
+      }
+
+      setShowDeleteModal(false);
+      setSelectedPostId(null);
+
+      Alert.alert('Thành công', 'Đã xóa bài viết');
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      Alert.alert('Lỗi', 'Không thể xóa bài viết. Vui lòng thử lại.');
     }
   };
 
@@ -296,6 +354,7 @@ export default function HistoryScreen() {
         {viewMode === 'fullscreen' ? (
           /* Full Screen View */
           <ScrollView
+            ref={scrollViewRef}
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             pagingEnabled={true}
@@ -340,7 +399,9 @@ export default function HistoryScreen() {
                   <TouchableOpacity
                     key={`feed-grid-${index}`}
                     style={styles.gridItem}
-                    onPress={() => handleImagePress(item.id)}
+                    onPress={() => handleImagePress(item.id, item.sender.id)}
+                    onLongPress={() => handleLongPress(item.id, item.sender.id)}
+                    delayLongPress={500}
                   >
                     <Image source={{ uri: item.image }} style={styles.gridImage} />
                     <View style={styles.gridOverlay}>
@@ -556,6 +617,43 @@ export default function HistoryScreen() {
                 })}
               </ScrollView>
             </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Delete Post Confirmation Modal */}
+        <Modal
+          visible={showDeleteModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDeleteModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.deleteModalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowDeleteModal(false)}
+          >
+            <View style={styles.deleteModalContent}>
+              <Text style={styles.deleteModalTitle}>Xóa bài viết?</Text>
+              <Text style={styles.deleteModalMessage}>
+                Bạn có chắc muốn xóa bài viết này? Hành động này không thể hoàn tác.
+              </Text>
+
+              <View style={styles.deleteModalButtons}>
+                <TouchableOpacity
+                  style={[styles.deleteModalButton, styles.cancelButton]}
+                  onPress={() => setShowDeleteModal(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Hủy</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.deleteModalButton, styles.confirmButton]}
+                  onPress={handleDeletePost}
+                >
+                  <Text style={styles.confirmButtonText}>Xóa</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </TouchableOpacity>
         </Modal>
       </SafeAreaView >
@@ -978,5 +1076,60 @@ const styles = StyleSheet.create({
   filterOptionTextSelected: {
     color: '#000',
     fontWeight: '600',
+  },
+  // Delete Modal Styles
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  deleteModalContent: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+  },
+  deleteModalTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  deleteModalMessage: {
+    color: '#ccc',
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deleteModalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#333',
+  },
+  confirmButton: {
+    backgroundColor: '#ff4444',
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

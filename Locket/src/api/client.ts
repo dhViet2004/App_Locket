@@ -47,4 +47,8 @@ export async function apiPatchForm<T>(url: string, form: FormData) {
   return res.data;
 }
 
+export async function apiDelete<T>(url: string, params?: Record<string, any>) {
+  const res = await apiClient.delete<ApiResponse<T>>(url, { params });
+  return res.data;
+}
 

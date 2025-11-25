@@ -68,4 +68,12 @@ export async function suggestCaptionApi(image: UploadImageFile) {
   );
 }
 
+/**
+ * Xóa một post
+ * DELETE /posts/:id
+ */
+export async function deletePostApi(postId: string) {
+  const { apiDelete } = await import('../client');
+  return apiDelete(`/posts/${postId}`);
+}
 
