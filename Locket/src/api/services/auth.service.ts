@@ -12,13 +12,40 @@ import type {
   CheckEmailResponse,
   CheckUsernameResponse,
 } from '../../types/api.types';
+import { mapUserResponse } from './user.service';
 
 export async function registerApi(body: RegisterRequest) {
-  return apiPost<AuthResponse, RegisterRequest>('/auth/register', body);
+  const response = await apiPost<AuthResponse, RegisterRequest>('/auth/register', body);
+  
+  // Map user._id thành user.id
+  if (response.success && response.data?.user) {
+    return {
+      ...response,
+      data: {
+        ...response.data,
+        user: mapUserResponse(response.data.user),
+      },
+    };
+  }
+  
+  return response;
 }
 
 export async function loginApi(body: LoginRequest) {
-  return apiPost<AuthResponse, LoginRequest>('/auth/login', body);
+  const response = await apiPost<AuthResponse, LoginRequest>('/auth/login', body);
+  
+  // Map user._id thành user.id
+  if (response.success && response.data?.user) {
+    return {
+      ...response,
+      data: {
+        ...response.data,
+        user: mapUserResponse(response.data.user),
+      },
+    };
+  }
+  
+  return response;
 }
 
 export async function sendOtpApi(body: SendOtpRequest) {

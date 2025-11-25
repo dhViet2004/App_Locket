@@ -8,227 +8,267 @@ import {
   Image,
   StatusBar,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-
-interface Participant {
-  _id: string;
-  username: string;
-  displayName?: string;
-  avatarUrl?: string;
-}
-
-interface LastMessage {
-  _id: string;
-  content: string;
-  type: 'text' | 'image';
-  senderId: Participant;
-  createdAt: string;
-}
-
-interface Conversation {
-  _id: string;
-  participants: Participant[];
-  lastMessage?: LastMessage | null;
-  lastMessageAt?: string | null;
-}
+import { useAuth } from '../src/context/AuthContext';
+import {
+  getConversationsApi,
+  createOrGetConversationApi,
+  type Conversation,
+  type Message,
+} from '../src/api/services/chat.service';
+import { getFriendsApi } from '../src/api/services/friendship.service';
+import type { FriendSummary } from '../src/types/api.types';
+import socketService from '../src/services/socket';
 
 export default function MessagesScreen() {
   const router = useRouter();
+  const { user, token } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showFriendsModal, setShowFriendsModal] = useState(false);
+  const [friends, setFriends] = useState<FriendSummary[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Dữ liệu mẫu
-  const getMockConversations = (): Conversation[] => {
-    const now = new Date();
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  // Load conversations từ API
+  useEffect(() => {
+    if (!token) {
+      console.log('[Messages] No token available');
+      setLoading(false);
+      return;
+    }
 
-    return [
-      {
-        _id: '1',
-        participants: [
-          {
-            _id: 'user1',
-            username: 'alice',
-            displayName: 'Alice Nguyen',
-            avatarUrl: undefined,
-          },
-          {
-            _id: 'current',
-            username: 'me',
-            displayName: 'Tôi',
-          },
-        ],
-        lastMessage: {
-          _id: 'msg1',
-          content: 'Xin chào! Bạn có khỏe không?',
-          type: 'text',
-          senderId: {
-            _id: 'user1',
-            username: 'alice',
-            displayName: 'Alice Nguyen',
-          },
-          createdAt: oneHourAgo.toISOString(),
-        },
-        lastMessageAt: oneHourAgo.toISOString(),
-      },
-      {
-        _id: '2',
-        participants: [
-          {
-            _id: 'user2',
-            username: 'bob',
-            displayName: 'Bob Tran',
-            avatarUrl: undefined,
-          },
-          {
-            _id: 'current',
-            username: 'me',
-            displayName: 'Tôi',
-          },
-        ],
-        lastMessage: {
-          _id: 'msg2',
-          content: '📷 Ảnh',
-          type: 'image',
-          senderId: {
-            _id: 'user2',
-            username: 'bob',
-            displayName: 'Bob Tran',
-          },
-          createdAt: threeHoursAgo.toISOString(),
-        },
-        lastMessageAt: threeHoursAgo.toISOString(),
-      },
-      {
-        _id: '3',
-        participants: [
-          {
-            _id: 'user3',
-            username: 'charlie',
-            displayName: 'Charlie Le',
-            avatarUrl: undefined,
-          },
-          {
-            _id: 'current',
-            username: 'me',
-            displayName: 'Tôi',
-          },
-        ],
-        lastMessage: {
-          _id: 'msg3',
-          content: 'Cảm ơn bạn đã giúp đỡ!',
-          type: 'text',
-          senderId: {
-            _id: 'current',
-            username: 'me',
-            displayName: 'Tôi',
-          },
-          createdAt: oneDayAgo.toISOString(),
-        },
-        lastMessageAt: oneDayAgo.toISOString(),
-      },
-      {
-        _id: '4',
-        participants: [
-          {
-            _id: 'user4',
-            username: 'diana',
-            displayName: 'Diana Pham',
-            avatarUrl: undefined,
-          },
-          {
-            _id: 'current',
-            username: 'me',
-            displayName: 'Tôi',
-          },
-        ],
-        lastMessage: {
-          _id: 'msg4',
-          content: 'Hẹn gặp lại vào tuần sau nhé!',
-          type: 'text',
-          senderId: {
-            _id: 'user4',
-            username: 'diana',
-            displayName: 'Diana Pham',
-          },
-          createdAt: twoDaysAgo.toISOString(),
-        },
-        lastMessageAt: twoDaysAgo.toISOString(),
-      },
-      {
-        _id: '5',
-        participants: [
-          {
-            _id: 'user5',
-            username: 'emma',
-            displayName: 'Emma Vo',
-            avatarUrl: undefined,
-          },
-          {
-            _id: 'current',
-            username: 'me',
-            displayName: 'Tôi',
-          },
-        ],
-        lastMessage: null,
-        lastMessageAt: null,
-      },
-      {
-        _id: '6',
-        participants: [
-          {
-            _id: 'user6',
-            username: 'frank',
-            displayName: 'Frank Hoang',
-            avatarUrl: undefined,
-          },
-          {
-            _id: 'current',
-            username: 'me',
-            displayName: 'Tôi',
-          },
-        ],
-        lastMessage: {
-          _id: 'msg6',
-          content: 'Bạn có muốn đi xem phim không?',
-          type: 'text',
-          senderId: {
-            _id: 'user6',
-            username: 'frank',
-            displayName: 'Frank Hoang',
-          },
-          createdAt: oneWeekAgo.toISOString(),
-        },
-        lastMessageAt: oneWeekAgo.toISOString(),
-      },
-    ];
+    const loadConversations = async () => {
+      try {
+        setLoading(true);
+        console.log('[Messages] Loading conversations with token:', token.substring(0, 20) + '...');
+        const response = await getConversationsApi(1, 50);
+        console.log('[Messages] API Response success:', response.success);
+        console.log('[Messages] API Response data:', response.data ? 'exists' : 'null');
+        
+        if (response.success && response.data) {
+          const conversations = response.data.conversations || [];
+          console.log('[Messages] Conversations loaded:', conversations.length);
+          console.log('[Messages] First conversation:', conversations[0] ? JSON.stringify(conversations[0], null, 2) : 'none');
+          setConversations(conversations);
+        } else {
+          console.warn('[Messages] API returned unsuccessful response:', {
+            success: response.success,
+            message: response.message,
+            data: response.data,
+          });
+          setConversations([]);
+        }
+      } catch (error: any) {
+        console.error('[Messages] Error loading conversations:', error);
+        if (error.response) {
+          console.error('[Messages] Error response:', {
+            status: error.response.status,
+            data: error.response.data,
+            headers: error.response.headers,
+          });
+        } else if (error.request) {
+          console.error('[Messages] No response received:', error.request);
+        } else {
+          console.error('[Messages] Error setting up request:', error.message);
+        }
+        setConversations([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadConversations();
+  }, [token]);
+
+  // Kết nối Socket và lắng nghe new_message để cập nhật conversations
+  useEffect(() => {
+    if (!token) return;
+
+    // Đảm bảo socket đã kết nối
+    if (!socketService.isConnected()) {
+      socketService.connect(token);
+    }
+
+    // Lắng nghe new_message để cập nhật lastMessage của conversation
+    const handleNewMessage = (data: { message: Message }) => {
+      const { message } = data;
+      console.log('[Messages] New message received:', message);
+
+      // Cập nhật conversation trong danh sách
+      setConversations((prev) => {
+        const conversationIndex = prev.findIndex(
+          (conv) => conv._id === message.conversationId
+        );
+
+        if (conversationIndex !== -1) {
+          // Conversation đã tồn tại, cập nhật lastMessage và di chuyển lên đầu
+          const updated = [...prev];
+          const conversation = updated[conversationIndex];
+          updated.splice(conversationIndex, 1); // Xóa khỏi vị trí cũ
+          updated.unshift({
+            // Thêm vào đầu với lastMessage mới
+            ...conversation,
+            lastMessage: {
+              _id: message._id,
+              content: message.content,
+              type: message.type,
+              senderId: message.senderId,
+              createdAt: message.createdAt,
+            },
+            lastMessageAt: message.createdAt,
+          });
+          return updated;
+        } else {
+          // Conversation chưa tồn tại, có thể cần reload danh sách
+          // Hoặc tạo conversation mới nếu cần
+          console.log('[Messages] Conversation not found, may need to reload');
+          return prev;
+        }
+      });
+    };
+
+    socketService.on('new_message', handleNewMessage);
+
+    // Cleanup
+    return () => {
+      socketService.off('new_message');
+    };
+  }, [token]);
+
+  // Load danh sách bạn bè khi mở modal
+  const loadFriends = async () => {
+    if (!token) return;
+
+    try {
+      setLoadingFriends(true);
+      const response = await getFriendsApi();
+      
+      if (response.success && response.data) {
+        // Map data để đảm bảo có id (backend có thể trả về _id)
+        const friendsData = (response.data.friends || []).map((friend: any) => ({
+          ...friend,
+          id: friend.id || friend._id, // Đảm bảo có id
+        }));
+        setFriends(friendsData);
+      }
+    } catch (error) {
+      console.error('[Messages] Error loading friends:', error);
+    } finally {
+      setLoadingFriends(false);
+    }
   };
 
-  useEffect(() => {
-    // Simulate loading
-    setLoading(true);
-    setTimeout(() => {
-      const mockData = getMockConversations();
-      setConversations(mockData);
-      setLoading(false);
-    }, 500);
-  }, []);
+  // Mở modal chọn bạn bè
+  const handleOpenFriendsModal = () => {
+    setShowFriendsModal(true);
+    loadFriends();
+  };
 
-  const getOtherParticipant = (conversation: Conversation): Participant | null => {
-    const currentUserId = 'current';
-    return conversation.participants.find(p => p._id !== currentUserId) || conversation.participants[0] || null;
+  // Tạo conversation với bạn bè được chọn
+  const handleSelectFriend = async (friend: FriendSummary) => {
+    if (!token || !friend.id) {
+      console.log('[Messages] Cannot create conversation: missing token or friend.id', {
+        hasToken: !!token,
+        friendId: friend.id,
+      });
+      return;
+    }
+
+    try {
+      console.log('[Messages] Creating conversation with friend:', friend.id);
+      const response = await createOrGetConversationApi(friend.id);
+      console.log('[Messages] Create conversation response:', {
+        success: response.success,
+        hasData: !!response.data,
+        data: response.data,
+      });
+      
+      if (response.success && response.data) {
+        // Backend trả về conversation trực tiếp trong data (không có nested conversation)
+        // Response structure: { success: true, data: { _id: "...", participants: [...], ... } }
+        const conversation = response.data as Conversation;
+        
+        console.log('[Messages] Conversation data:', conversation);
+        console.log('[Messages] Conversation _id:', conversation._id);
+        
+        if (!conversation || !conversation._id) {
+          console.error('[Messages] Invalid conversation data:', {
+            hasData: !!response.data,
+            data: response.data,
+            conversation,
+          });
+          return;
+        }
+        
+        setShowFriendsModal(false);
+        setSearchQuery('');
+        
+        // Navigate đến chat detail
+        router.push({
+          pathname: '/chat/[conversationId]' as any,
+          params: { conversationId: conversation._id },
+        });
+        
+        // Reload conversations để cập nhật danh sách
+        try {
+          const conversationsResponse = await getConversationsApi(1, 50);
+          if (conversationsResponse.success && conversationsResponse.data) {
+            setConversations(conversationsResponse.data.conversations || []);
+          }
+        } catch (reloadError) {
+          console.error('[Messages] Error reloading conversations:', reloadError);
+        }
+      } else {
+        console.warn('[Messages] Create conversation failed:', {
+          success: response.success,
+          hasData: !!response.data,
+          message: response.message,
+        });
+      }
+    } catch (error: any) {
+      console.error('[Messages] Error creating conversation:', error);
+      console.error('[Messages] Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        stack: error?.stack,
+      });
+    }
+  };
+
+  // Lọc bạn bè theo search query
+  const filteredFriends = friends.filter((friend) => {
+    const query = searchQuery.toLowerCase();
+    const displayName = (friend.displayName || friend.username || '').toLowerCase();
+    const username = (friend.username || '').toLowerCase();
+    return displayName.includes(query) || username.includes(query);
+  });
+
+  const getOtherParticipant = (conversation: Conversation) => {
+    if (!user?.id) {
+      console.log('[Messages] No user ID available');
+      return null;
+    }
+    
+    // Backend trả về _id, AuthUser có id (không có underscore)
+    // So sánh bằng string để đảm bảo chính xác
+    const currentUserId = String(user.id);
+    const otherParticipant = conversation.participants.find(
+      (p) => String(p._id) !== currentUserId
+    );
+    
+    return otherParticipant || conversation.participants[0] || null;
   };
 
   const formatTime = (dateString?: string | null): string => {
     if (!dateString) return '';
-    
+
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -240,10 +280,10 @@ export default function MessagesScreen() {
     if (diffMins < 60) return `${diffMins}m`;
     if (diffHours < 24) return `${diffHours}h`;
     if (diffDays < 7) return `${diffDays}d`;
-    
+
     const diffWeeks = Math.floor(diffDays / 7);
     if (diffWeeks < 4) return `${diffWeeks}w`;
-    
+
     const diffMonths = Math.floor(diffDays / 30);
     return `${diffMonths}mo`;
   };
@@ -262,25 +302,26 @@ export default function MessagesScreen() {
 
     const displayName = otherUser.displayName || otherUser.username;
     const hasMessage = item.lastMessage && item.lastMessage.content;
-    const messagePreview = hasMessage 
-      ? (item.lastMessage!.type === 'image' ? '📷 Ảnh' : item.lastMessage!.content)
+    const messagePreview = hasMessage
+      ? item.lastMessage!.type === 'image'
+        ? '📷 Ảnh'
+        : item.lastMessage!.content
       : 'Chưa có câu trả lời nào!';
 
     return (
       <TouchableOpacity
         style={styles.conversationItem}
         onPress={() => {
-          // TODO: Navigate to chat detail screen
-          console.log('Open conversation:', item._id);
+          router.push({
+            pathname: '/chat/[conversationId]' as any,
+            params: { conversationId: item._id },
+          });
         }}
       >
         {/* Avatar */}
         <View style={styles.avatarContainer}>
           {otherUser.avatarUrl ? (
-            <Image
-              source={{ uri: otherUser.avatarUrl }}
-              style={styles.avatar}
-            />
+            <Image source={{ uri: otherUser.avatarUrl }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
@@ -295,9 +336,7 @@ export default function MessagesScreen() {
               {displayName}
             </Text>
             {item.lastMessageAt && (
-              <Text style={styles.timeText}>
-                {formatTime(item.lastMessageAt)}
-              </Text>
+              <Text style={styles.timeText}>{formatTime(item.lastMessageAt)}</Text>
             )}
           </View>
           <Text
@@ -337,14 +376,16 @@ export default function MessagesScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Tin nhắn</Text>
-          <View style={styles.headerSpacer} />
+          <TouchableOpacity
+            style={styles.newMessageButton}
+            onPress={handleOpenFriendsModal}
+          >
+            <Ionicons name="create-outline" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
 
         {/* Content */}
@@ -364,6 +405,92 @@ export default function MessagesScreen() {
             showsVerticalScrollIndicator={false}
           />
         )}
+
+        {/* Modal chọn bạn bè */}
+        <Modal
+          visible={showFriendsModal}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setShowFriendsModal(false)}
+          accessibilityViewIsModal={true}
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <StatusBar barStyle="light-content" backgroundColor="#000" />
+            
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => {
+                  setShowFriendsModal(false);
+                  setSearchQuery('');
+                }}
+              >
+                <Ionicons name="close" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Chọn bạn bè</Text>
+              <View style={styles.modalHeaderSpacer} />
+            </View>
+
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Tìm kiếm bạn bè..."
+                placeholderTextColor="#666"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+
+            {/* Friends List */}
+            {loadingFriends ? (
+              <View style={styles.modalLoadingContainer}>
+                <ActivityIndicator size="large" color="#FFFFFF" />
+              </View>
+            ) : (
+              <FlatList
+                data={filteredFriends}
+                renderItem={({ item }) => {
+                  const displayName = item.displayName || item.username;
+                  return (
+                    <TouchableOpacity
+                      style={styles.friendItem}
+                      onPress={() => handleSelectFriend(item)}
+                    >
+                      <View style={styles.avatarContainer}>
+                        {item.avatarUrl ? (
+                          <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
+                        ) : (
+                          <View style={styles.avatarPlaceholder}>
+                            <Text style={styles.avatarText}>
+                              {getInitials(displayName)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.friendInfo}>
+                        <Text style={styles.friendName}>{displayName}</Text>
+                        <Text style={styles.friendUsername}>@{item.username}</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color="#666" />
+                    </TouchableOpacity>
+                  );
+                }}
+                keyExtractor={(item) => item.id}
+                ListEmptyComponent={
+                  <View style={styles.modalEmptyContainer}>
+                    <Ionicons name="people-outline" size={64} color="#666" />
+                    <Text style={styles.modalEmptyText}>
+                      {searchQuery ? 'Không tìm thấy bạn bè' : 'Chưa có bạn bè nào'}
+                    </Text>
+                  </View>
+                }
+              />
+            )}
+          </SafeAreaView>
+        </Modal>
       </SafeAreaView>
     </>
   );
@@ -398,6 +525,12 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40,
+  },
+  newMessageButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -498,5 +631,92 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#000000',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222222',
+  },
+  modalCloseButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  modalTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginLeft: 8,
+  },
+  modalHeaderSpacer: {
+    width: 40,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A1A1A',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+    paddingVertical: 12,
+  },
+  modalLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  friendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#000000',
+    borderBottomWidth: 1,
+    borderBottomColor: '#111111',
+  },
+  friendInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  friendName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  friendUsername: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  modalEmptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 100,
+  },
+  modalEmptyText: {
+    fontSize: 16,
+    color: '#666666',
+    marginTop: 16,
+    textAlign: 'center',
+  },
 });
-

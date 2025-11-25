@@ -1,9 +1,55 @@
 import React, { createContext, useCallback, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import type { AuthResponse, AuthUser } from '../types/api.types';
 import { loginApi } from '../api/services/auth.service';
 import { getUserProfileApi } from '../api/services/user.service';
 import { isAxiosError } from 'axios';
 import { apiClient } from '../api/client';
+
+const AUTH_TOKEN_KEY = 'auth_token';
+const AUTH_USER_KEY = 'auth_user';
+
+// Storage helper với fallback cho web
+const storage = {
+  async getItem(key: string): Promise<string | null> {
+    try {
+      if (Platform.OS === 'web') {
+        return localStorage.getItem(key);
+      } else {
+        return await SecureStore.getItemAsync(key);
+      }
+    } catch (error) {
+      console.error(`[Storage] Error getting ${key}:`, error);
+      return null;
+    }
+  },
+
+  async setItem(key: string, value: string): Promise<void> {
+    try {
+      if (Platform.OS === 'web') {
+        localStorage.setItem(key, value);
+      } else {
+        await SecureStore.setItemAsync(key, value);
+      }
+    } catch (error) {
+      console.error(`[Storage] Error setting ${key}:`, error);
+      throw error;
+    }
+  },
+
+  async removeItem(key: string): Promise<void> {
+    try {
+      if (Platform.OS === 'web') {
+        localStorage.removeItem(key);
+      } else {
+        await SecureStore.deleteItemAsync(key);
+      }
+    } catch (error) {
+      console.error(`[Storage] Error removing ${key}:`, error);
+    }
+  },
+};
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -40,19 +86,94 @@ function withDefaultAvatar(user: AuthUser | null): AuthUser | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Bắt đầu với loading = true để restore từ storage
   const [error, setError] = useState<string | null>(null);
   
   // Ref để tránh gọi refreshUser() đồng thời nhiều lần
   const refreshUserPromiseRef = React.useRef<Promise<void> | null>(null);
+  
+  // Restore auth state từ storage khi app khởi động
+  useEffect(() => {
+    const restoreAuth = async () => {
+      try {
+        console.log('[AuthContext] 🔄 Restoring auth from storage...');
+        const [storedToken, storedUserJson] = await Promise.all([
+          storage.getItem(AUTH_TOKEN_KEY),
+          storage.getItem(AUTH_USER_KEY),
+        ]);
+
+        if (storedToken) {
+          console.log('[AuthContext] ✅ Token found in storage');
+          setToken(storedToken);
+          apiClient.defaults.headers.common.Authorization = `Bearer ${storedToken}`;
+
+          // Nếu có user trong storage, restore ngay
+          if (storedUserJson) {
+            try {
+              const storedUser = JSON.parse(storedUserJson) as AuthUser;
+              console.log('[AuthContext] ✅ User found in storage:', storedUser.id);
+              setUser(withDefaultAvatar(storedUser));
+            } catch (e) {
+              console.warn('[AuthContext] ⚠️ Failed to parse stored user:', e);
+            }
+          }
+
+          // Refresh user từ API để đảm bảo data mới nhất
+          try {
+            const userResponse = await getUserProfileApi();
+            if (userResponse.data) {
+              console.log('[AuthContext] ✅ User refreshed from API:', userResponse.data.id);
+              setUser(withDefaultAvatar(userResponse.data));
+              // Lưu lại user mới vào storage
+              await storage.setItem(AUTH_USER_KEY, JSON.stringify(userResponse.data));
+            }
+          } catch (refreshErr) {
+            console.warn('[AuthContext] ⚠️ Failed to refresh user, using stored user:', refreshErr);
+            // Nếu refresh fail, vẫn dùng stored user nếu có
+            if (storedUserJson) {
+              try {
+                const storedUser = JSON.parse(storedUserJson) as AuthUser;
+                setUser(withDefaultAvatar(storedUser));
+              } catch (e) {
+                // Nếu cả stored user cũng không parse được, clear auth
+                console.error('[AuthContext] ❌ Invalid stored user, clearing auth');
+                await storage.removeItem(AUTH_TOKEN_KEY);
+                await storage.removeItem(AUTH_USER_KEY);
+                setToken(null);
+                setUser(null);
+              }
+            }
+          }
+        } else {
+          console.log('[AuthContext] ℹ️ No token in storage');
+        }
+      } catch (error) {
+        console.error('[AuthContext] ❌ Error restoring auth:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    restoreAuth();
+  }, []);
 
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
-  const setAuthState = useCallback((payload: AuthResponse) => {
-    setUser(withDefaultAvatar(payload.user));
+  const setAuthState = useCallback(async (payload: AuthResponse) => {
+    const userWithAvatar = withDefaultAvatar(payload.user);
+    setUser(userWithAvatar);
     setToken(payload.token);
+    
+    // Lưu vào storage
+    try {
+      await storage.setItem(AUTH_TOKEN_KEY, payload.token);
+      await storage.setItem(AUTH_USER_KEY, JSON.stringify(userWithAvatar));
+      console.log('[AuthContext] ✅ Auth state saved to storage');
+    } catch (error) {
+      console.error('[AuthContext] ❌ Failed to save auth to storage:', error);
+    }
   }, []);
 
   const login = useCallback(async (identifier: string, password: string) => {
@@ -70,14 +191,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await loginApi({ identifier: normalizedIdentifier, password: normalizedPassword });
-      setAuthState(response.data);
+      await setAuthState(response.data);
       // Refresh user info để đảm bảo có đầy đủ thông tin (bao gồm avatarUrl)
       if (response.data.token) {
         // Set token trước để refreshUser có thể gọi API
         apiClient.defaults.headers.common.Authorization = `Bearer ${response.data.token}`;
         try {
           const userResponse = await getUserProfileApi();
-          setUser(withDefaultAvatar(userResponse.data));
+          const refreshedUser = withDefaultAvatar(userResponse.data);
+          setUser(refreshedUser);
+          // Cập nhật user mới vào storage
+          await storage.setItem(AUTH_USER_KEY, JSON.stringify(refreshedUser));
         } catch (refreshErr) {
           console.error('Error refreshing user after login:', refreshErr);
           // Nếu refresh fail, vẫn dùng data từ login response
@@ -100,13 +224,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [setAuthState]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     setUser(null);
     setToken(null);
+    
+    // Xóa khỏi storage
+    try {
+      await storage.removeItem(AUTH_TOKEN_KEY);
+      await storage.removeItem(AUTH_USER_KEY);
+      console.log('[AuthContext] ✅ Auth state cleared from storage');
+    } catch (error) {
+      console.error('[AuthContext] ❌ Failed to clear auth from storage:', error);
+    }
   }, []);
 
-  const updateUser = useCallback((updatedUser: AuthUser) => {
-    setUser(withDefaultAvatar(updatedUser));
+  const updateUser = useCallback(async (updatedUser: AuthUser) => {
+    const userWithAvatar = withDefaultAvatar(updatedUser);
+    setUser(userWithAvatar);
+    
+    // Cập nhật vào storage
+    try {
+      await storage.setItem(AUTH_USER_KEY, JSON.stringify(userWithAvatar));
+      console.log('[AuthContext] ✅ User updated in storage');
+    } catch (error) {
+      console.error('[AuthContext] ❌ Failed to update user in storage:', error);
+    }
   }, []);
 
   const refreshUser = useCallback(async () => {
