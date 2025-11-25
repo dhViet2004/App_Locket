@@ -1,8 +1,34 @@
 import { apiGet, apiPatchForm, apiPost } from '../client';
 import type { AuthUser, ChangeEmailRequest, ChangePasswordRequest } from '../../types/api.types';
 
+// Helper function để map _id thành id (dùng chung cho tất cả API trả về user)
+export function mapUserResponse(userData: any): AuthUser {
+  if (!userData) return userData;
+  
+  // Nếu đã có id thì giữ nguyên, nếu có _id thì map thành id
+  if (userData._id && !userData.id) {
+    const { _id, ...rest } = userData;
+    return {
+      ...rest,
+      id: String(_id),
+    } as AuthUser;
+  }
+  
+  return userData as AuthUser;
+}
+
 export async function getUserProfileApi() {
-  return apiGet<AuthUser>('/users/me');
+  const response = await apiGet<any>('/users/me');
+  
+  // Map response data từ _id sang id
+  if (response.success && response.data) {
+    return {
+      ...response,
+      data: mapUserResponse(response.data),
+    };
+  }
+  
+  return response as any;
 }
 
 export async function updateAvatarApi(formData: FormData) {
