@@ -112,6 +112,23 @@ export interface FriendsListResponse {
   count: number;
 }
 
+// Pending Friend Requests
+export interface PendingRequest {
+  _id: string;
+  requestedBy: {
+    _id: string;
+    username: string;
+    displayName?: string;
+    avatarUrl?: string;
+  };
+  createdAt: string;
+}
+
+export interface PendingRequestsResponse {
+  requests: PendingRequest[];
+  count: number;
+}
+
 // Feed
 export interface FeedPostAuthor {
   _id: string;

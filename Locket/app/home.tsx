@@ -13,7 +13,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useAuth } from "../src/context/AuthContext";
 import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
-import { getFriendsApi } from "../src/api/services/friendship.service";
+import { getFriendsApi, sendFriendRequestByUsernameApi, getPendingRequestsApi, acceptFriendRequestApi } from "../src/api/services/friendship.service";
+import type { PendingRequest } from "../src/types/api.types";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -26,6 +27,11 @@ export default function HomeScreen() {
   const [showFriendsModal, setShowFriendsModal] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [friendCount, setFriendCount] = useState(0);
+  const [isSendingRequest, setIsSendingRequest] = useState(false);
+  const [requestMessage, setRequestMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [acceptingRequestId, setAcceptingRequestId] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
@@ -39,7 +45,7 @@ export default function HomeScreen() {
       playThroughEarpieceAndroid: false,
     }).catch((error: unknown) => console.warn('Failed to set audio mode', error));
   }, []);
-  
+
   useEffect(() => {
     let isMounted = true;
 
@@ -61,13 +67,13 @@ export default function HomeScreen() {
       isMounted = false;
     };
   }, []);
-  
+
   // Hide debug text in development
   if (__DEV__) {
-    console.warn = () => {};
-    console.log = () => {};
+    console.warn = () => { };
+    console.log = () => { };
   }
-  
+
   // Modal drag animation
   const modalHeight = useRef(new Animated.Value(screenHeight * 0.6)).current;
 
@@ -77,7 +83,7 @@ export default function HomeScreen() {
         // Get current orientation
         const orientation = await ScreenOrientation.getOrientationAsync();
         console.log('Current orientation:', orientation);
-        
+
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.8,
           base64: false,
@@ -85,11 +91,11 @@ export default function HomeScreen() {
           exif: true, // Include EXIF data for proper orientation
         });
         console.log('Photo taken:', photo.uri);
-        
+
         // Navigate to photo preview screen with photo URI and orientation
         router.push({
           pathname: '/photo-preview',
-          params: { 
+          params: {
             photoUri: photo.uri,
             orientation: orientation.toString()
           }
@@ -101,24 +107,107 @@ export default function HomeScreen() {
   };
 
   const toggleCameraType = () => {
-    setCameraType(current => 
+    setCameraType(current =>
       current === 'back' ? 'front' : 'back'
     );
   };
 
   const toggleFlash = () => {
-    setFlashMode(current => 
+    setFlashMode(current =>
       current === 'off' ? 'on' : 'off'
     );
   };
 
-  const openFriendsModal = () => {
+  const openFriendsModal = async () => {
     setShowFriendsModal(true);
+    await fetchPendingRequests();
+  };
+
+  const fetchPendingRequests = async () => {
+    setIsLoadingRequests(true);
+    try {
+      const response = await getPendingRequestsApi();
+      const data = response.data as any;
+      setPendingRequests(data?.requests || []);
+    } catch (error) {
+      console.error('[Home] Failed to fetch pending requests:', error);
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  };
+
+  const handleAcceptRequest = async (requestId: string) => {
+    setAcceptingRequestId(requestId);
+    try {
+      await acceptFriendRequestApi(requestId);
+
+      // Remove from pending list
+      setPendingRequests(prev => prev.filter(req => req._id !== requestId));
+
+      // Refresh friend count
+      const response = await getFriendsApi();
+      const nextCount = response.data?.count ?? response.data?.friends?.length ?? 0;
+      setFriendCount(nextCount);
+
+      // Show success message
+      setRequestMessage({ type: 'success', text: 'Đã chấp nhận lời mời kết bạn' });
+      setTimeout(() => setRequestMessage(null), 3000);
+    } catch (error: any) {
+      console.error('[Home] Failed to accept request:', error);
+      const errorMsg = error.response?.data?.message || 'Không thể chấp nhận lời mời';
+      setRequestMessage({ type: 'error', text: errorMsg });
+      setTimeout(() => setRequestMessage(null), 3000);
+    } finally {
+      setAcceptingRequestId(null);
+    }
   };
 
   const closeFriendsModal = () => {
     setShowFriendsModal(false);
     modalHeight.setValue(screenHeight * 0.6);
+  };
+
+  const handleSendFriendRequest = async () => {
+    if (!searchText.trim()) return;
+
+    setIsSendingRequest(true);
+    setRequestMessage(null);
+
+    try {
+      await sendFriendRequestByUsernameApi(searchText.trim());
+      setRequestMessage({ type: 'success', text: `Đã gửi lời mời kết bạn đến ${searchText}` });
+      setSearchText('');
+
+      // Refresh friend count
+      const response = await getFriendsApi();
+      const nextCount = response.data?.count ?? response.data?.friends?.length ?? 0;
+      setFriendCount(nextCount);
+
+      // Clear message after 3 seconds
+      setTimeout(() => setRequestMessage(null), 3000);
+    } catch (error: any) {
+      console.error('[Home] Friend request error:', error);
+      console.error('[Home] Error response:', error.response?.data);
+
+      let errorMsg = 'Đã có lỗi xảy ra';
+
+      if (error.response?.data?.message) {
+        errorMsg = error.response.data.message;
+      } else if (error.response?.status === 404) {
+        errorMsg = `Không tìm thấy người dùng "${searchText}"`;
+      } else if (error.response?.status === 400) {
+        errorMsg = error.response.data?.message || 'Yêu cầu không hợp lệ';
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+
+      setRequestMessage({ type: 'error', text: errorMsg });
+
+      // Clear error after 3 seconds
+      setTimeout(() => setRequestMessage(null), 3000);
+    } finally {
+      setIsSendingRequest(false);
+    }
   };
 
   // Gesture handlers for navigation
@@ -129,7 +218,7 @@ export default function HomeScreen() {
   const handleGestureStateChange = (event: any) => {
     if (event.nativeEvent.state === State.END) {
       const { translationX, translationY, velocityX, velocityY } = event.nativeEvent;
-      
+
       // Swipe down to go to history
       if (translationY > 50 && velocityY > 500) {
         router.push('/history');
@@ -160,7 +249,7 @@ export default function HomeScreen() {
         modalHeight.flattenOffset();
         const currentHeight = (modalHeight as any)._value;
         const velocity = gestureState.vy;
-        
+
         if (velocity > 0.5 || currentHeight < screenHeight * 0.5) {
           // Close modal
           Animated.timing(modalHeight, {
@@ -192,21 +281,21 @@ export default function HomeScreen() {
 
   return (
     <>
-      <Stack.Screen 
-        options={{ 
+      <Stack.Screen
+        options={{
           headerShown: false,
           navigationBarColor: '#000000',
           statusBarStyle: 'light',
           statusBarBackgroundColor: '#000000'
-        }} 
+        }}
       />
       <StatusBar style="light" backgroundColor="#000000" />
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           {/* Profile Avatar */}
-          <TouchableOpacity 
-            style={styles.headerButton} 
+          <TouchableOpacity
+            style={styles.headerButton}
             onPress={() => {
               console.log('[Home] Profile button pressed');
               console.log('[Home] Navigation state before push:', {
@@ -271,10 +360,10 @@ export default function HomeScreen() {
             <View style={styles.footer}>
               {/* Flash Button */}
               <TouchableOpacity style={styles.controlButton} onPress={toggleFlash}>
-                <MaterialCommunityIcons 
-                  name="flash-outline" 
-                  size={40} 
-                  color={flashMode === 'on' ? '#FF8C00' : 'white'} 
+                <MaterialCommunityIcons
+                  name="flash-outline"
+                  size={40}
+                  color={flashMode === 'on' ? '#FF8C00' : 'white'}
                 />
               </TouchableOpacity>
 
@@ -310,18 +399,18 @@ export default function HomeScreen() {
         >
           <View style={styles.modalOverlay}>
             {/* Touchable overlay to close modal when tapping outside */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.modalOverlayTouchable}
               activeOpacity={1}
               onPress={closeFriendsModal}
             />
-            <Animated.View 
+            <Animated.View
               style={[styles.modalContainer, { height: modalHeight }]}
               {...panResponder.panHandlers}
             >
               {/* Handle */}
               <View style={styles.modalHandle} />
-              
+
               {/* Header */}
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Bạn bè của bạn</Text>
@@ -337,11 +426,96 @@ export default function HomeScreen() {
                   placeholderTextColor="#666"
                   value={searchText}
                   onChangeText={setSearchText}
+                  onSubmitEditing={handleSendFriendRequest}
+                  returnKeyType="send"
+                  editable={!isSendingRequest}
                 />
+                {searchText.trim().length > 0 && (
+                  <TouchableOpacity
+                    onPress={handleSendFriendRequest}
+                    disabled={isSendingRequest}
+                    style={styles.addButton}
+                  >
+                    {isSendingRequest ? (
+                      <Text style={styles.addButtonText}>...</Text>
+                    ) : (
+                      <Ionicons name="add-circle" size={28} color="#FF8C00" />
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
+
+              {/* Success/Error Message */}
+              {requestMessage && (
+                <View style={[
+                  styles.messageContainer,
+                  requestMessage.type === 'success' ? styles.successMessage : styles.errorMessage
+                ]}>
+                  <Ionicons
+                    name={requestMessage.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                    size={20}
+                    color={requestMessage.type === 'success' ? '#4CAF50' : '#F44336'}
+                  />
+                  <Text style={styles.messageText}>{requestMessage.text}</Text>
+                </View>
+              )}
 
               {/* Scrollable Content */}
               <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+                {/* Pending Requests Section */}
+                {(isLoadingRequests || pendingRequests.length > 0) && (
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>
+                      Lời mời kết bạn {pendingRequests.length > 0 && `(${pendingRequests.length})`}
+                    </Text>
+
+                    {isLoadingRequests ? (
+                      <View style={styles.loadingContainer}>
+                        <Text style={styles.loadingText}>Đang tải...</Text>
+                      </View>
+                    ) : (
+                      pendingRequests.map((request) => (
+                        <View key={request._id} style={styles.pendingRequestItem}>
+                          <View style={styles.requestUserInfo}>
+                            {request.requestedBy.avatarUrl ? (
+                              <Image
+                                source={{ uri: request.requestedBy.avatarUrl }}
+                                style={styles.requestAvatar}
+                              />
+                            ) : (
+                              <View style={[styles.requestAvatar, styles.defaultAvatar]}>
+                                <FontAwesome5 name="user" size={20} color="#666" />
+                              </View>
+                            )}
+                            <View style={styles.requestUserText}>
+                              <Text style={styles.requestUsername}>
+                                {request.requestedBy.displayName || request.requestedBy.username}
+                              </Text>
+                              <Text style={styles.requestTime}>
+                                {new Date(request.createdAt).toLocaleDateString('vi-VN')}
+                              </Text>
+                            </View>
+                          </View>
+                          <TouchableOpacity
+                            style={[
+                              styles.acceptButton,
+                              acceptingRequestId === request._id && styles.acceptButtonDisabled
+                            ]}
+                            onPress={() => handleAcceptRequest(request._id)}
+                            disabled={acceptingRequestId === request._id}
+                          >
+                            {acceptingRequestId === request._id ? (
+                              <Text style={styles.acceptButtonText}>...</Text>
+                            ) : (
+                              <Text style={styles.acceptButtonText}>Chấp nhận</Text>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                )}
+
                 {/* Find Friends Section */}
                 <View style={styles.sectionContainer}>
                   <Text style={styles.sectionTitle}>Tìm bạn bè từ các ứng dụng khác</Text>
@@ -352,21 +526,21 @@ export default function HomeScreen() {
                       </View>
                       <Text style={styles.appName}>Messen...</Text>
                     </TouchableOpacity>
-                    
+
                     <TouchableOpacity style={styles.appIcon}>
                       <View style={[styles.appIconCircle, { backgroundColor: '#0068FF' }]}>
                         <Text style={styles.zaloText}>Zalo</Text>
                       </View>
                       <Text style={styles.appName}>Zalo</Text>
                     </TouchableOpacity>
-                    
+
                     <TouchableOpacity style={styles.appIcon}>
                       <View style={[styles.appIconCircle, { backgroundColor: '#E4405F' }]}>
                         <FontAwesome5 name="instagram" size={24} color="white" />
                       </View>
                       <Text style={styles.appName}>Insta</Text>
                     </TouchableOpacity>
-                    
+
                     <TouchableOpacity style={styles.appIcon}>
                       <View style={[styles.appIconCircle, { backgroundColor: '#666' }]}>
                         <Ionicons name="share" size={24} color="white" />
@@ -379,42 +553,42 @@ export default function HomeScreen() {
                 {/* Invite Friends Section */}
                 <View style={styles.sectionContainer}>
                   <Text style={styles.sectionTitle}>Mời từ các ứng dụng khác</Text>
-                  
+
                   <TouchableOpacity style={styles.inviteItem}>
                     <View style={[styles.appIconCircle, { backgroundColor: '#0084FF' }]}>
                       <FontAwesome5 name="facebook-messenger" size={24} color="white" />
                     </View>
                     <Text style={styles.inviteText}>Messenger</Text>
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity style={styles.inviteItem}>
                     <View style={[styles.appIconCircle, { backgroundColor: '#0068FF' }]}>
                       <Text style={styles.zaloText}>Zalo</Text>
                     </View>
                     <Text style={styles.inviteText}>Zalo</Text>
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity style={styles.inviteItem}>
                     <View style={[styles.appIconCircle, { backgroundColor: '#E4405F' }]}>
                       <FontAwesome5 name="instagram" size={24} color="white" />
                     </View>
                     <Text style={styles.inviteText}>Instagram Dms</Text>
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity style={styles.inviteItem}>
                     <View style={[styles.appIconCircle, { backgroundColor: '#0084FF' }]}>
                       <Ionicons name="chatbubble" size={24} color="white" />
                     </View>
                     <Text style={styles.inviteText}>Messages</Text>
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity style={styles.inviteItem}>
                     <View style={[styles.appIconCircle, { backgroundColor: '#0088CC' }]}>
                       <FontAwesome5 name="telegram-plane" size={24} color="white" />
                     </View>
                     <Text style={styles.inviteText}>Telegram</Text>
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity style={styles.inviteItem}>
                     <View style={[styles.appIconCircle, { backgroundColor: '#666' }]}>
                       <Ionicons name="share" size={24} color="white" />
@@ -570,7 +744,7 @@ const styles = StyleSheet.create({
   historyContainer: {
     alignItems: 'center',
     paddingVertical: 20,
-    marginBottom:39,
+    marginBottom: 39,
     backgroundColor: '#000000',
   },
   historyText: {
@@ -688,5 +862,94 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginLeft: 16,
     fontWeight: '500',
+  },
+  addButton: {
+    marginLeft: 8,
+  },
+  addButtonText: {
+    color: '#FF8C00',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  messageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  successMessage: {
+    backgroundColor: '#1B5E20',
+  },
+  errorMessage: {
+    backgroundColor: '#B71C1C',
+  },
+  messageText: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 14,
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#999',
+    fontSize: 14,
+  },
+  pendingRequestItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  requestUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  requestAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+  },
+  defaultAvatar: {
+    backgroundColor: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  requestUserText: {
+    flex: 1,
+  },
+  requestUsername: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  requestTime: {
+    fontSize: 12,
+    color: '#999',
+  },
+  acceptButton: {
+    backgroundColor: '#FF8C00',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  acceptButtonDisabled: {
+    opacity: 0.5,
+  },
+  acceptButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

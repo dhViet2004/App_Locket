@@ -261,10 +261,16 @@ export default function HistoryScreen() {
             /* Grid View Header */
             <>
               <TouchableOpacity onPress={handleProfile} style={styles.headerButton}>
-                <Image
-                  source={{ uri: 'https://res.cloudinary.com/dh1o42tjk/image/upload/v1761231281/taskmanagement/avatars/a0hsc7oncibdgnvhbgbp.jpg' }}
-                  style={styles.profileAvatar}
-                />
+                {user?.avatarUrl ? (
+                  <Image
+                    source={{ uri: user.avatarUrl }}
+                    style={styles.profileAvatar}
+                  />
+                ) : (
+                  <View style={styles.profileAvatar}>
+                    <FontAwesome5 name="user-circle" size={24} color="white" />
+                  </View>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -552,7 +558,7 @@ export default function HistoryScreen() {
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
-      </SafeAreaView>
+      </SafeAreaView >
     </>
   );
 }
