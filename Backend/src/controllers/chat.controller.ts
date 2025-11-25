@@ -6,10 +6,16 @@ import {
   createMessage,
   findOrCreateConversation,
   markMessagesAsRead,
+  getRecentMessages,
 } from '../services/chat.service';
 import { ok, ApiError } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
 import { uploadToCloudinary } from '../utils/cloudinary';
+import { groqService } from '../services/groq.service';
+import { getSocketIOInstance } from '../services/socket.service';
+import { env } from '../config/env';
+import { Conversation } from '../models/conversation.model';
+import { Types } from 'mongoose';
 
 // Định nghĩa type cho Multer file
 interface MulterFile {
@@ -118,6 +124,91 @@ export const sendMessageHandler = asyncHandler(async (req: ChatRequest, res: Res
   // Tạo message
   const message = await createMessage(conversationId, req.userId, messageContent, messageType);
 
+  // Kiểm tra nếu đây là conversation với Bot
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) {
+    throw new ApiError(404, 'Conversation not found');
+  }
+
+  // Debug: Log để kiểm tra
+  const participantIds = conversation.participants.map((p) => {
+    // Đảm bảo convert đúng sang string
+    const id = p instanceof Types.ObjectId ? p.toString() : String(p);
+    return id;
+  });
+  
+  // So sánh BOT_ID (có thể là string hoặc ObjectId)
+  const botIdString = env.BOT_ID ? String(env.BOT_ID).trim() : '';
+  const isBotConversation = botIdString && participantIds.some((id) => id === botIdString);
+  
+  console.log('[AI Bot] Checking bot conversation:', {
+    conversationId,
+    participants: participantIds,
+    botId: botIdString,
+    isBotConversation,
+    messageType,
+    groqAvailable: groqService.isAvailable(),
+  });
+
+  // Nếu là chat với Bot, xử lý AI response trong background
+  if (isBotConversation && messageType === 'text' && groqService.isAvailable()) {
+    console.log('[AI Bot] Processing bot response in background...');
+    // Response ngay cho client (không chờ AI)
+    res.status(201).json(ok(message, 'Message sent successfully'));
+
+    // Xử lý AI response trong background (async, không await)
+    (async () => {
+      try {
+        console.log('[AI Bot] Starting bot response generation...');
+        
+        // Lấy lịch sử chat gần đây để làm context
+        const history = await getRecentMessages(conversationId, 15);
+        console.log('[AI Bot] Chat history loaded:', history.length, 'messages');
+
+        // Gọi AI để generate response
+        console.log('[AI Bot] Calling Groq API...');
+        const botResponse = await groqService.generateBotResponse(messageContent, history);
+        console.log('[AI Bot] Bot response generated:', botResponse.substring(0, 50) + '...');
+
+        // Tạo message mới từ Bot
+        const botMessage = await createMessage(
+          conversationId,
+          env.BOT_ID,
+          botResponse,
+          'text'
+        );
+        console.log('[AI Bot] Bot message created:', botMessage._id);
+
+        // Populate để có đầy đủ thông tin
+        await botMessage.populate('senderId', 'username displayName avatarUrl');
+        await botMessage.populate('conversationId');
+
+        // Emit socket event để client nhận được message từ Bot
+        const io = getSocketIOInstance();
+        if (io) {
+          const roomName = `conversation:${conversationId}`;
+          io.to(roomName).emit('new_message', {
+            message: botMessage.toObject(),
+          });
+          console.log(`[AI Bot] Socket event emitted to room: ${roomName}`);
+        } else {
+          console.warn('[AI Bot] Socket.io instance not available');
+        }
+        
+        console.log('[AI Bot] Bot response completed successfully');
+      } catch (error) {
+        console.error('[AI Bot] Error generating response:', error);
+        if (error instanceof Error) {
+          console.error('[AI Bot] Error details:', error.message, error.stack);
+        }
+        // Không throw error để không ảnh hưởng đến response đã gửi cho client
+      }
+    })();
+
+    return; // Đã response rồi, không cần return gì thêm
+  }
+
+  // Nếu không phải bot conversation, response bình thường
   return res.status(201).json(ok(message, 'Message sent successfully'));
 });
 
