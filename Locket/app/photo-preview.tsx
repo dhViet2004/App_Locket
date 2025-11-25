@@ -11,7 +11,6 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -22,6 +21,11 @@ import { buildCreatePostFormData, createPostApi, type UploadImageFile } from "..
 import { getFriendsApi } from "../src/api/services/friendship.service";
 import type { PostVisibility } from "../src/types/api.types";
 import CaptionSuggestion from "../src/components/CaptionSuggestion";
+import { Canvas, Path, Skia, useCanvasRef } from "@shopify/react-native-skia";
+import * as ImageManipulator from 'expo-image-manipulator';
+import { PanResponder, Platform } from 'react-native';
+import { cleanupImageApi } from "../src/api/services/cleanup.service";
+import * as FileSystem from 'expo-file-system/legacy';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -50,12 +54,18 @@ export default function PhotoPreviewScreen() {
   const [visibility] = useState<PostVisibility>('friends');
   const [isSending, setIsSending] = useState(false);
 
+  // Magic Eraser State
+  const [isEraserMode, setIsEraserMode] = useState(false);
+  const [paths, setPaths] = useState<any[]>([]);
+  const [isCleaning, setIsCleaning] = useState(false);
+  const canvasRef = useCanvasRef();
+  const [eraserPhotoUri, setEraserPhotoUri] = useState<string | null>(null);
+
+  const currentPhotoUri = eraserPhotoUri || (Array.isArray(photoUri) ? photoUri[0] : photoUri);
+
   const resolvedPhotoUri = useMemo(() => {
-    if (Array.isArray(photoUri)) {
-      return photoUri[0];
-    }
-    return photoUri;
-  }, [photoUri]);
+    return currentPhotoUri;
+  }, [currentPhotoUri]);
 
 
   const recipients = useMemo(() => {
@@ -205,6 +215,106 @@ export default function PhotoPreviewScreen() {
     router.back();
   };
 
+  // PanResponder for drawing
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponderCapture: () => true,
+    onMoveShouldSetPanResponderCapture: () => true,
+
+    onPanResponderGrant: (evt) => {
+      const { locationX, locationY } = evt.nativeEvent;
+      const newPath = Skia.Path.Make();
+      newPath.moveTo(locationX, locationY);
+      setPaths((current) => [...current, { path: newPath, color: "white" }]);
+    },
+    onPanResponderMove: (evt) => {
+      const { locationX, locationY } = evt.nativeEvent;
+      setPaths((current) => {
+        if (current.length === 0) return current;
+        const lastItem = current[current.length - 1];
+        lastItem.path.lineTo(locationX, locationY);
+        return [...current];
+      });
+    },
+  }), []);
+
+  const handleCleanup = async () => {
+    if (!resolvedPhotoUri) return;
+    setIsCleaning(true);
+
+    try {
+      const imageSnapshot = canvasRef.current?.makeImageSnapshot();
+      if (!imageSnapshot) {
+        Alert.alert("Lỗi", "Chưa có vùng chọn");
+        setIsCleaning(false);
+        return;
+      }
+
+      const maskBase64 = imageSnapshot.encodeToBase64();
+
+      // Save mask to file using expo-file-system
+      const maskFileName = `mask_${Date.now()}.png`;
+      const maskPath = `${FileSystem.cacheDirectory}${maskFileName}`;
+
+      // Write base64 to file (use string 'base64' instead of EncodingType enum)
+      await FileSystem.writeAsStringAsync(maskPath, maskBase64, {
+        encoding: 'base64',
+      });
+
+      // Small delay to ensure file is flushed to disk
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      console.log('Mask saved to:', maskPath);
+
+      const PHOTO_SIZE = screenWidth - 20;
+
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        resolvedPhotoUri as string,
+        [{ resize: { width: PHOTO_SIZE, height: PHOTO_SIZE } }],
+        { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      const formData = new FormData();
+      // @ts-ignore
+      formData.append('image', {
+        uri: manipulatedImage.uri,
+        type: 'image/jpeg',
+        name: 'resized.jpg'
+      });
+      // @ts-ignore - Send mask as file
+      formData.append('mask', {
+        uri: maskPath,
+        type: 'image/png',
+        name: 'mask.png'
+      });
+
+      console.log('Sending to backend...');
+      const response = await cleanupImageApi(formData);
+
+      if (response.data && response.data.result) {
+        setEraserPhotoUri(response.data.result);
+        setPaths([]);
+        setIsEraserMode(false);
+
+        // Clean up temp mask file
+        try {
+          await FileSystem.deleteAsync(maskPath, { idempotent: true });
+        } catch (e) {
+          console.log('Failed to delete temp mask:', e);
+        }
+      } else {
+        Alert.alert("Lỗi Server", "Không nhận được kết quả từ server");
+      }
+
+    } catch (error: any) {
+      console.error("Error cleaning up:", error);
+      Alert.alert("Lỗi", error.message || "Đã có lỗi xảy ra");
+    } finally {
+      setIsCleaning(false);
+    }
+  };
+
   const handleAddText = () => {
     // Logic thêm text
   };
@@ -213,10 +323,10 @@ export default function PhotoPreviewScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
-      
+
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Gửi đến...</Text>
-        
+
       </View>
 
       <View style={styles.mainContent}>
@@ -227,17 +337,40 @@ export default function PhotoPreviewScreen() {
             style={styles.photo}
             resizeMode="cover"
           />
-          
-          <View style={styles.messageOverlay}>
-            <TextInput
-              style={styles.messageInput}
-              placeholder="Thêm một tin nhắn"
-              placeholderTextColor="#999"
-              value={messageText}
-              onChangeText={setMessageText}
-              multiline
-            />
-          </View>
+
+          {isEraserMode && (
+            <View
+              style={styles.canvasLayer}
+              {...panResponder.panHandlers}
+            >
+              <Canvas ref={canvasRef} style={{ flex: 1 }}>
+                {paths.map((p, index) => (
+                  <Path
+                    key={index}
+                    path={p.path}
+                    color="white"
+                    style="stroke"
+                    strokeWidth={30}
+                    strokeCap="round"
+                    strokeJoin="round"
+                  />
+                ))}
+              </Canvas>
+            </View>
+          )}
+
+          {!isEraserMode && (
+            <View style={styles.messageOverlay}>
+              <TextInput
+                style={styles.messageInput}
+                placeholder="Thêm một tin nhắn"
+                placeholderTextColor="#999"
+                value={messageText}
+                onChangeText={setMessageText}
+                multiline
+              />
+            </View>
+          )}
         </View>
 
         {/* Page Indicator */}
@@ -254,27 +387,67 @@ export default function PhotoPreviewScreen() {
         />
 
         {/* Control Buttons */}
-        <View style={styles.controlButtons}>
-          <TouchableOpacity style={styles.controlButton} onPress={handleCancel} disabled={isSending}>
-            <Ionicons name="close" size={24} color="#fff" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
-            onPress={handleSend}
-            disabled={isSending}
-          >
-            {isSending ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Ionicons name="paper-plane" size={28} color="#fff" />
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.controlButton} onPress={handleAddText} disabled={isSending}>
-            <Text style={styles.textIcon}>Aa</Text>
-          </TouchableOpacity>
-        </View>
+        {isEraserMode ? (
+          <View style={styles.controlButtons}>
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={() => {
+                setIsEraserMode(false);
+                setPaths([]);
+                setEraserPhotoUri(null); // Reset if cancelled? Or keep? Let's reset if they cancel.
+              }}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+              <Text style={styles.controlLabel}>Hủy</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.sendButton, isCleaning && styles.sendButtonDisabled, { backgroundColor: '#ff4444' }]}
+              onPress={handleCleanup}
+              disabled={isCleaning}
+            >
+              {isCleaning ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Ionicons name="sparkles" size={28} color="#fff" />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={() => {
+                setIsEraserMode(false);
+                setPaths([]);
+                // Keep the eraserPhotoUri as the current photo
+              }}
+            >
+              <Ionicons name="checkmark" size={24} color="#fff" />
+              <Text style={styles.controlLabel}>Xong</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.controlButtons}>
+            <TouchableOpacity style={styles.controlButton} onPress={handleCancel} disabled={isSending}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
+              onPress={handleSend}
+              disabled={isSending}
+            >
+              {isSending ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Ionicons name="paper-plane" size={28} color="#fff" />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.controlButton} onPress={() => setIsEraserMode(true)} disabled={isSending}>
+              <Ionicons name="color-wand" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <View style={styles.recipientsContainer}>
@@ -484,5 +657,17 @@ const styles = StyleSheet.create({
     color: '#aaa',
     marginLeft: 6,
     fontSize: 12,
+  },
+  canvasLayer: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+    zIndex: 100,
+    elevation: 10,
+  },
+  controlLabel: {
+    color: '#fff',
+    fontSize: 12,
+    marginTop: 4,
   },
 });
