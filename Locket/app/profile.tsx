@@ -499,20 +499,58 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Đăng xuất',
-      'Bạn có chắc chắn muốn đăng xuất?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đăng xuất',
-          onPress: () => {
-            logout();
-            router.replace('/');
-          }
+    // Trên web, Alert có thể không hoạt động tốt, dùng confirm thay thế
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Bạn có chắc chắn muốn đăng xuất?');
+      if (!confirmed) return;
+      
+      // Thực hiện logout ngay lập tức trên web
+      (async () => {
+        try {
+          console.log('[Profile] Starting logout process (web)...');
+          await logout();
+          console.log('[Profile] Logout completed, navigating to index...');
+          
+          // Navigate về màn hình login
+          router.replace('/');
+          
+          // Force reload page trên web để đảm bảo state được reset hoàn toàn
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 300);
+        } catch (error) {
+          console.error('[Profile] Error during logout:', error);
+          router.replace('/');
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 300);
         }
-      ]
-    );
+      })();
+    } else {
+      // Trên mobile, dùng Alert như bình thường
+      Alert.alert(
+        'Đăng xuất',
+        'Bạn có chắc chắn muốn đăng xuất?',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Đăng xuất',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                console.log('[Profile] Starting logout process...');
+                await logout();
+                console.log('[Profile] Logout completed, navigating to index...');
+                router.replace('/');
+              } catch (error) {
+                console.error('[Profile] Error during logout:', error);
+                router.replace('/');
+              }
+            }
+          }
+        ]
+      );
+    }
   };
 
   const renderSection = (title: string, children: React.ReactNode) => (

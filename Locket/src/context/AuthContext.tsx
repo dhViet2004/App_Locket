@@ -6,6 +6,7 @@ import { loginApi } from '../api/services/auth.service';
 import { getUserProfileApi } from '../api/services/user.service';
 import { isAxiosError } from 'axios';
 import { apiClient } from '../api/client';
+import socketService from '../services/socket';
 
 const AUTH_TOKEN_KEY = 'auth_token';
 const AUTH_USER_KEY = 'auth_user';
@@ -57,7 +58,7 @@ interface AuthContextValue {
   loading: boolean;
   error: string | null;
   login: (identifier: string, password: string) => Promise<AuthResponse>;
-  logout: () => void;
+  logout: () => Promise<void>;
   clearError: () => void;
   setAuthState: (payload: AuthResponse) => void;
   updateUser: (user: AuthUser) => void;
@@ -92,9 +93,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Ref để tránh gọi refreshUser() đồng thời nhiều lần
   const refreshUserPromiseRef = React.useRef<Promise<void> | null>(null);
   
+  // Ref để đánh dấu đang trong quá trình logout (tránh restore lại sau logout)
+  const isLoggingOutRef = React.useRef(false);
+  
   // Restore auth state từ storage khi app khởi động
   useEffect(() => {
     const restoreAuth = async () => {
+      // Nếu đang trong quá trình logout, không restore
+      if (isLoggingOutRef.current) {
+        console.log('[AuthContext] ⏸️ Skipping restore - logout in progress');
+        setLoading(false);
+        return;
+      }
+      
       try {
         console.log('[AuthContext] 🔄 Restoring auth from storage...');
         const [storedToken, storedUserJson] = await Promise.all([
@@ -225,6 +236,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [setAuthState]);
 
   const logout = useCallback(async () => {
+    console.log('[AuthContext] 🔄 Logging out...');
+    
+    // Đánh dấu đang logout để tránh restore lại
+    isLoggingOutRef.current = true;
+    
+    // Disconnect socket trước
+    try {
+      socketService.disconnect();
+      console.log('[AuthContext] ✅ Socket disconnected');
+    } catch (error) {
+      console.error('[AuthContext] ❌ Failed to disconnect socket:', error);
+    }
+    
+    // Xóa Authorization header
+    delete apiClient.defaults.headers.common.Authorization;
+    
+    // Clear state TRƯỚC khi xóa storage
     setUser(null);
     setToken(null);
     
@@ -236,6 +264,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('[AuthContext] ❌ Failed to clear auth from storage:', error);
     }
+    
+    // Đợi một chút để đảm bảo state đã được clear
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Reset flag sau khi logout hoàn thành
+    isLoggingOutRef.current = false;
+    
+    console.log('[AuthContext] ✅ Logout completed');
   }, []);
 
   const updateUser = useCallback(async (updatedUser: AuthUser) => {
