@@ -54,7 +54,9 @@ export interface Conversation {
       displayName?: string;
       avatarUrl?: string;
     };
+    isRead?: boolean; // Backend Message model có field isRead
     createdAt: string;
+    updatedAt: string; // Backend Message model có timestamps: true nên luôn có updatedAt
   } | null;
   lastMessageAt?: string | null;
   createdAt: string;

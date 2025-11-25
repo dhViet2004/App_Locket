@@ -25,6 +25,9 @@ import { getFriendsApi } from '../src/api/services/friendship.service';
 import type { FriendSummary } from '../src/types/api.types';
 import socketService from '../src/services/socket';
 
+// Bot AI ID - Tự động tạo conversation với Bot khi load
+const BOT_AI_ID = '692570398a0f1e0dd9fc6396';
+
 export default function MessagesScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
@@ -34,6 +37,7 @@ export default function MessagesScreen() {
   const [friends, setFriends] = useState<FriendSummary[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const botConversationCreatedRef = React.useRef(false);
 
   // Load conversations từ API
   useEffect(() => {
@@ -56,6 +60,40 @@ export default function MessagesScreen() {
           console.log('[Messages] Conversations loaded:', conversations.length);
           console.log('[Messages] First conversation:', conversations[0] ? JSON.stringify(conversations[0], null, 2) : 'none');
           setConversations(conversations);
+
+          // Tự động tạo conversation với Bot AI nếu chưa có (chỉ chạy 1 lần)
+          if (!botConversationCreatedRef.current && user?.id) {
+            const hasBotConversation = conversations.some((conv) => {
+              return conv.participants.some(
+                (p) => String(p._id) === String(BOT_AI_ID)
+              );
+            });
+
+            if (!hasBotConversation) {
+              console.log('[Messages] Bot conversation not found, creating automatically...');
+              // Đánh dấu ngay để tránh tạo lại nhiều lần
+              botConversationCreatedRef.current = true;
+              
+              try {
+                const botConvResponse = await createOrGetConversationApi(BOT_AI_ID);
+                if (botConvResponse.success && botConvResponse.data) {
+                  console.log('[Messages] Bot conversation created successfully');
+                  // Reload conversations để hiển thị conversation với Bot
+                  const reloadResponse = await getConversationsApi(1, 50);
+                  if (reloadResponse.success && reloadResponse.data) {
+                    setConversations(reloadResponse.data.conversations || []);
+                  }
+                }
+              } catch (botError: any) {
+                console.error('[Messages] Error creating bot conversation:', botError);
+                // Reset flag nếu lỗi để có thể thử lại lần sau
+                botConversationCreatedRef.current = false;
+              }
+            } else {
+              // Đã có conversation với Bot rồi, đánh dấu để không kiểm tra lại
+              botConversationCreatedRef.current = true;
+            }
+          }
         } else {
           console.warn('[Messages] API returned unsuccessful response:', {
             success: response.success,
@@ -84,7 +122,7 @@ export default function MessagesScreen() {
     };
 
     loadConversations();
-  }, [token]);
+  }, [token, user?.id]);
 
   // Kết nối Socket và lắng nghe new_message để cập nhật conversations
   useEffect(() => {
@@ -120,6 +158,7 @@ export default function MessagesScreen() {
               type: message.type,
               senderId: message.senderId,
               createdAt: message.createdAt,
+              updatedAt: message.updatedAt,
             },
             lastMessageAt: message.createdAt,
           });

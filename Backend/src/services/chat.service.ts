@@ -24,8 +24,23 @@ export async function areFriends(userId1: string, userId2: string): Promise<bool
 }
 
 /**
+ * Helper function: Kiểm tra xem một trong hai user có phải là Bot không
+ * So sánh an toàn với nhiều kiểu dữ liệu (string, ObjectId, etc.)
+ */
+function isBotConversation(userId1: string, userId2: string): boolean {
+  if (!env.BOT_ID) return false;
+  
+  // Convert tất cả sang string để so sánh
+  const botIdStr = String(env.BOT_ID).trim();
+  const userId1Str = String(userId1).trim();
+  const userId2Str = String(userId2).trim();
+  
+  return userId1Str === botIdStr || userId2Str === botIdStr;
+}
+
+/**
  * Tìm hoặc tạo conversation giữa hai user
- * Kiểm tra friendship trước khi tạo
+ * Cho phép tất cả user chat với Bot AI (không cần friendship)
  * @param userId1 - ID của user thứ nhất
  * @param userId2 - ID của user thứ hai
  * @returns Conversation object
@@ -36,9 +51,10 @@ export async function findOrCreateConversation(userId1: string, userId2: string)
   }
 
   // Bỏ qua kiểm tra friendship nếu một trong hai user là Bot
-  const isBotConversation = userId1 === env.BOT_ID || userId2 === env.BOT_ID;
+  // Cho phép tất cả user chat với Bot AI
+  const isBot = isBotConversation(userId1, userId2);
   
-  if (!isBotConversation) {
+  if (!isBot) {
     // Kiểm tra friendship chỉ khi không phải chat với Bot
     const isFriend = await areFriends(userId1, userId2);
     if (!isFriend) {
@@ -84,7 +100,7 @@ export async function createMessage(
 
   // Kiểm tra sender có phải là participant không
   const isParticipant = conversation.participants.some(
-    (p) => p.toString() === senderId
+    (p: Types.ObjectId) => p.toString() === senderId
   );
   if (!isParticipant) {
     throw new ApiError(403, 'You are not a participant of this conversation');
@@ -92,15 +108,17 @@ export async function createMessage(
 
   // Kiểm tra friendship giữa sender và người còn lại (bỏ qua nếu là Bot)
   const otherParticipant = conversation.participants.find(
-    (p) => p.toString() !== senderId
+    (p: Types.ObjectId) => p.toString() !== senderId
   );
   if (!otherParticipant) {
     throw new ApiError(400, 'Invalid conversation participants');
   }
 
-  const isBotConversation = senderId === env.BOT_ID || otherParticipant.toString() === env.BOT_ID;
+  // Bỏ qua kiểm tra friendship nếu một trong hai user là Bot
+  // Cho phép tất cả user chat với Bot AI
+  const isBot = isBotConversation(senderId, otherParticipant.toString());
   
-  if (!isBotConversation) {
+  if (!isBot) {
     // Chỉ kiểm tra friendship khi không phải chat với Bot
     const isFriend = await areFriends(senderId, otherParticipant.toString());
     if (!isFriend) {
@@ -183,7 +201,7 @@ export async function getMessages(conversationId: string, userId: string, page: 
   }
 
   const isParticipant = conversation.participants.some(
-    (p) => p.toString() === userId
+    (p: Types.ObjectId) => p.toString() === userId
   );
   if (!isParticipant) {
     throw new ApiError(403, 'You are not a participant of this conversation');
@@ -250,7 +268,7 @@ export async function markMessagesAsRead(conversationId: string, userId: string)
   }
 
   const isParticipant = conversation.participants.some(
-    (p) => p.toString() === userId
+    (p: Types.ObjectId) => p.toString() === userId
   );
   if (!isParticipant) {
     throw new ApiError(403, 'You are not a participant of this conversation');

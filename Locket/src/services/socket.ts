@@ -165,77 +165,118 @@ class SocketService {
   }
 
   /**
-   * Format room ID để đảm bảo luôn có format "conversation:ID"
-   * Tránh việc nối chuỗi 2 lần (thành "conversation:conversation:ID")
-   * @param conversationId - ID của conversation (có thể đã có hoặc chưa có prefix "conversation:")
-   * @returns Room ID với format "conversation:ID"
+   * Helper function: Chuẩn hóa Room Name để đảm bảo idempotency
+   * Single Source of Truth: Room Name BẮT BUỘC phải có format "conversation:{ID}"
+   * 
+   * Logic xử lý thông minh:
+   * - Nếu input là "123" -> Trả về "conversation:123"
+   * - Nếu input đã là "conversation:123" -> Trả về "conversation:123" (Giữ nguyên, KHÔNG nối thêm)
+   * - Nếu input là Object (ObjectId) -> Convert sang string rồi xử lý
+   * - Nếu input là null/undefined -> Trả về empty string
+   * 
+   * @param id - ID của conversation (có thể là string, ObjectId, hoặc bất kỳ type nào)
+   * @returns Room Name với format "conversation:ID" (idempotent - gọi nhiều lần vẫn trả về cùng kết quả)
    */
-  private formatRoomId(conversationId: string): string {
-    return conversationId.startsWith('conversation:')
-      ? conversationId
-      : `conversation:${conversationId}`;
+  private getRoomName(id: string | any): string {
+    // Xử lý null/undefined
+    if (id === null || id === undefined) {
+      return '';
+    }
+
+    // Convert sang string (xử lý cả ObjectId, number, object có toString())
+    const idStr = String(id).trim();
+
+    // Nếu rỗng sau khi trim, trả về empty string
+    if (!idStr) {
+      return '';
+    }
+
+    // Kiểm tra xem đã có prefix "conversation:" chưa
+    // Nếu có rồi -> Giữ nguyên (idempotent)
+    // Nếu chưa có -> Thêm prefix
+    return idStr.startsWith('conversation:') ? idStr : `conversation:${idStr}`;
   }
 
   /**
    * Join vào conversation room
-   * @param conversationId - ID của conversation
+   * @param conversationId - ID của conversation (có thể là string, ObjectId, hoặc bất kỳ type nào)
    * Backend sử dụng format room name: "conversation:ID"
    */
-  public joinConversation(conversationId: string): void {
+  public joinConversation(conversationId: string | any): void {
     if (!this.socket || !this.socket.connected) {
       console.warn('[Socket] Cannot join conversation: socket not connected');
       return;
     }
 
-    const roomId = this.formatRoomId(conversationId);
+    const roomName = this.getRoomName(conversationId);
+    if (!roomName) {
+      console.warn('[Socket] Cannot join conversation: invalid conversationId');
+      return;
+    }
+
     // Backend sử dụng event 'join_room' với room name format: "conversation:ID"
-    this.socket.emit('join_room', { conversationId: roomId });
+    this.socket.emit('join_room', { conversationId: roomName });
   }
 
   /**
    * Leave khỏi conversation room
-   * @param conversationId - ID của conversation
+   * @param conversationId - ID của conversation (có thể là string, ObjectId, hoặc bất kỳ type nào)
    * Backend sử dụng format room name: "conversation:ID"
    */
-  public leaveConversation(conversationId: string): void {
+  public leaveConversation(conversationId: string | any): void {
     if (!this.socket || !this.socket.connected) {
       console.warn('[Socket] Cannot leave conversation: socket not connected');
       return;
     }
 
-    const roomId = this.formatRoomId(conversationId);
+    const roomName = this.getRoomName(conversationId);
+    if (!roomName) {
+      console.warn('[Socket] Cannot leave conversation: invalid conversationId');
+      return;
+    }
+
     // Backend sử dụng event 'leave_room' với room name format: "conversation:ID"
-    this.socket.emit('leave_room', { conversationId: roomId });
+    this.socket.emit('leave_room', { conversationId: roomName });
   }
 
   /**
    * Gửi typing indicator (user đang gõ)
-   * @param conversationId - ID của conversation
+   * @param conversationId - ID của conversation (có thể là string, ObjectId, hoặc bất kỳ type nào)
    * Backend sử dụng format room name: "conversation:ID"
    */
-  public sendTyping(conversationId: string): void {
+  public sendTyping(conversationId: string | any): void {
     if (!this.socket || !this.socket.connected) {
       console.warn('[Socket] Cannot send typing: socket not connected');
       return;
     }
 
-    const roomId = this.formatRoomId(conversationId);
-    this.socket.emit('typing_start', { conversationId: roomId });
+    const roomName = this.getRoomName(conversationId);
+    if (!roomName) {
+      console.warn('[Socket] Cannot send typing: invalid conversationId');
+      return;
+    }
+
+    this.socket.emit('typing_start', { conversationId: roomName });
   }
 
   /**
    * Gửi stop typing indicator (user dừng gõ)
-   * @param conversationId - ID của conversation
+   * @param conversationId - ID của conversation (có thể là string, ObjectId, hoặc bất kỳ type nào)
    * Backend sử dụng format room name: "conversation:ID"
    */
-  public sendStopTyping(conversationId: string): void {
+  public sendStopTyping(conversationId: string | any): void {
     if (!this.socket || !this.socket.connected) {
       console.warn('[Socket] Cannot send stop typing: socket not connected');
       return;
     }
 
-    const roomId = this.formatRoomId(conversationId);
-    this.socket.emit('typing_stop', { conversationId: roomId });
+    const roomName = this.getRoomName(conversationId);
+    if (!roomName) {
+      console.warn('[Socket] Cannot send stop typing: invalid conversationId');
+      return;
+    }
+
+    this.socket.emit('typing_stop', { conversationId: roomName });
   }
 
   /**
@@ -298,12 +339,12 @@ const socketService = SocketService.getInstance();
 export const connect = (token: string) => socketService.connect(token);
 export const disconnect = () => socketService.disconnect();
 export const getSocket = () => socketService.getSocket();
-export const joinConversation = (conversationId: string) =>
+export const joinConversation = (conversationId: string | any) =>
   socketService.joinConversation(conversationId);
-export const leaveConversation = (conversationId: string) =>
+export const leaveConversation = (conversationId: string | any) =>
   socketService.leaveConversation(conversationId);
-export const sendTyping = (conversationId: string) => socketService.sendTyping(conversationId);
-export const sendStopTyping = (conversationId: string) =>
+export const sendTyping = (conversationId: string | any) => socketService.sendTyping(conversationId);
+export const sendStopTyping = (conversationId: string | any) =>
   socketService.sendStopTyping(conversationId);
 export const on = (event: string, callback: (...args: any[]) => void) =>
   socketService.on(event, callback);
